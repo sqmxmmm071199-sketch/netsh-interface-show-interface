@@ -1,0 +1,2 @@
+ALTER TABLE "BrandMemory" ADD COLUMN "source" TEXT;
+ALTER TABLE "BrandMemory" ADD COLUMN "importance" INTEGER NOT NULL DEFAULT 3;

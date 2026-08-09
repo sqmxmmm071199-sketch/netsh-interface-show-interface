@@ -1,0 +1,234 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Platform {
+  INSTAGRAM
+  TIKTOK
+  FACEBOOK
+  PINTEREST
+  LINKEDIN
+  XIAOHONGSHU
+}
+
+enum AssetType {
+  IMAGE
+  VIDEO
+  DOCUMENT
+  LINK
+  TEXT
+}
+
+enum AssetStatus {
+  UNUSED
+  USED
+  ARCHIVED
+}
+
+enum ContentStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ContentType {
+  POST
+  CAROUSEL
+  SHORT_VIDEO_SCRIPT
+  STORY
+  AD_COPY
+}
+
+enum MemoryType {
+  PREFERENCE
+  BRAND_RULE
+  PLATFORM_INSIGHT
+  CONTENT_RULE
+  COMPLIANCE_RULE
+}
+
+model User {
+  id        String      @id @default(cuid())
+  authUserId String?    @unique
+  email     String      @unique
+  name      String?
+  avatarUrl String?
+  workspaces Workspace[] @relation("WorkspaceOwner")
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model Workspace {
+  id           String                @id @default(cuid())
+  name         String
+  slug         String                @unique
+  ownerId      String
+  owner        User                  @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  brandProfile BrandProfile?
+  assetBatches AssetBatch[]
+  assets       Asset[]
+  contents     GeneratedContent[]
+  calendarItems ContentCalendarItem[]
+  memories     BrandMemory[]
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  @@index([ownerId])
+}
+
+model BrandProfile {
+  id              String    @id @default(cuid())
+  workspaceId     String    @unique
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brandName       String
+  websiteUrl      String?
+  storeUrl        String?
+  industry        String?
+  productDescription String?
+  targetAudience  String?
+  brandTone       String?
+  brandKeywords   String[]  @default([])
+  tagline         String?
+  description     String?
+  toneKeywords    String[]  @default([])
+  targetAudiences String[]  @default([])
+  forbiddenWords  String[]  @default([])
+  competitorLinks String[]  @default([])
+  platformPreferences Json?
+  brandSummary    String?
+  targetAudienceSummary String?
+  toneOfVoice     String[]  @default([])
+  contentAngles   String[]  @default([])
+  forbiddenClaims String[]  @default([])
+  recommendedPlatforms String[] @default([])
+  marketingSuggestions String[] @default([])
+  aiAnalysisUpdatedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model AssetBatch {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  source      String?
+  assets      Asset[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId])
+}
+
+model Asset {
+  id               String             @id @default(cuid())
+  workspaceId      String
+  workspace        Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  batchId          String
+  batch            AssetBatch         @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  type             AssetType
+  status           AssetStatus        @default(UNUSED)
+  title            String
+  description      String?
+  url              String
+  fileName         String?
+  fileType         String?
+  fileUrl          String?
+  thumbnailUrl     String?
+  usageStatus      AssetStatus        @default(UNUSED)
+  aiDescription    String?
+  productName      String?
+  scene            String?
+  visualStyle      String?
+  suggestedUse     String?
+  recommendedPlatforms String[]       @default([])
+  mimeType         String?
+  sizeBytes        Int?
+  tags             String[]           @default([])
+  metadata         Json?
+  generatedContents GeneratedContent[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([workspaceId])
+  @@index([batchId])
+  @@index([status])
+  @@index([usageStatus])
+}
+
+model GeneratedContent {
+  id          String       @id @default(cuid())
+  workspaceId String
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title       String
+  type        ContentType
+  status      ContentStatus @default(DRAFT)
+  platforms   Platform[]    @default([])
+  prompt      String?
+  brief       String?
+  body        String
+  hashtags    String[]      @default([])
+  callToAction String?
+  model       String?
+  metadata    Json?
+  riskNotes   Json?
+  assets      Asset[]
+  calendarItems ContentCalendarItem[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([workspaceId])
+  @@index([status])
+  @@index([type])
+}
+
+model ContentCalendarItem {
+  id                 String            @id @default(cuid())
+  workspaceId        String
+  workspace          Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  generatedContentId String?
+  generatedContent   GeneratedContent? @relation(fields: [generatedContentId], references: [id], onDelete: SetNull)
+  title              String
+  description        String?
+  platform           Platform
+  contentType        ContentType
+  status             ContentStatus     @default(DRAFT)
+  scheduledAt        DateTime
+  publishedAt        DateTime?
+  ownerName          String?
+  notes              String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([workspaceId])
+  @@index([generatedContentId])
+  @@index([scheduledAt])
+  @@index([status])
+}
+
+model BrandMemory {
+  id          String     @id @default(cuid())
+  workspaceId String
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type        MemoryType
+  title       String
+  content     String
+  source      String?
+  importance  Int        @default(3)
+  tags        String[]    @default([])
+  priority    Int         @default(0)
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([workspaceId])
+  @@index([type])
+  @@index([isActive])
+}

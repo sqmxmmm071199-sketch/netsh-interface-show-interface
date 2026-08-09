@@ -1,0 +1,30 @@
+# dependencies
+node_modules
+
+# next
+.next
+out
+
+# production
+build
+
+# local runtime data
+data/
+logs/*
+!logs/.gitkeep
+public/mock-uploads/*
+!public/mock-uploads/.gitkeep
+
+# env
+.env
+.env*.local
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dev-server*.log
+
+# misc
+.DS_Store

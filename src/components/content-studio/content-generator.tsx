@@ -288,6 +288,7 @@ export function ContentGenerator({
       message: "正在生成内容并进行合规检查，通常需要 10-30 秒，请稍候。",
     });
     setSavedIndexes([]);
+    setVariants([]);
     setIsGenerating(true);
 
     try {

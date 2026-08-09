@@ -229,14 +229,32 @@ export async function POST(request: Request) {
       extraInstructions: values.extraInstructions,
     };
 
-    const result = isAiConfigured()
-      ? await generateContentVariants(promptInput)
-      : {
+    const result = await (async () => {
+      if (!isAiConfigured()) {
+        return {
           data: createContentGenerationFallback(promptInput),
           raw: "",
           parsed: false,
           error: `${getAiProviderLabel()} API key is not configured.`,
         };
+      }
+
+      try {
+        return await generateContentVariants(promptInput);
+      } catch (error) {
+        logError("content-studio/generate:ai", error, {
+          workspaceId: workspace.id,
+          provider: getAiProviderLabel(),
+        });
+
+        return {
+          data: createContentGenerationFallback(promptInput),
+          raw: "",
+          parsed: false,
+          error: `${getAiProviderLabel()} 暂时不可用，已返回本地基础生成结果。`,
+        };
+      }
+    })();
 
     const variantsWithCompliance = await checkGeneratedVariants({
       variants: result.data.slice(0, values.numberOfVariants),
@@ -249,7 +267,7 @@ export async function POST(request: Request) {
         message: isAiConfigured()
           ? result.parsed
             ? `${getAiProviderLabel()} 内容已生成，并已完成合规检查。`
-            : `${getAiProviderLabel()} 返回格式不完整，已返回基础生成结果并完成合规检查。`
+            : `${result.error ?? `${getAiProviderLabel()} 返回格式不完整，已返回基础生成结果。`}已完成合规检查。`
           : `未配置 ${getAiProviderLabel()} API Key，已返回本地基础生成结果并完成合规检查。`,
         parsed: result.parsed,
         parseError: result.error,

@@ -161,8 +161,8 @@ function AssetTile({ asset }: { asset: BatchAssetItem }) {
   const usage = getUsageSummary(asset.generatedContents);
 
   return (
-    <div className="grid min-h-[28rem] min-w-0 grid-rows-[auto_1fr] overflow-hidden rounded-md border bg-background">
-      <div className="flex min-w-0 items-start justify-between gap-3 border-b bg-muted/35 p-3">
+    <div className="grid min-h-[28rem] min-w-0 max-w-[32rem] grid-rows-[auto_1fr] overflow-hidden rounded-md border bg-background">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 border-b bg-muted/35 p-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground">
             <AssetIcon type={asset.type} status={asset.status} />
@@ -217,7 +217,7 @@ function AssetTile({ asset }: { asset: BatchAssetItem }) {
           <Separator />
 
           <div className="min-w-0 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <div className="grid gap-2 text-sm sm:grid-cols-[1fr_auto] sm:items-center">
               <span className="font-medium">内容使用情况</span>
               <Badge
                 variant={usage.isPublished ? "default" : "outline"}
@@ -230,8 +230,8 @@ function AssetTile({ asset }: { asset: BatchAssetItem }) {
             {asset.generatedContents.length > 0 ? (
               <div className="min-w-0 space-y-2">
                 {asset.generatedContents.slice(0, 4).map((content) => (
-                  <div key={content.id} className="min-w-0 rounded-md border px-3 py-2">
-                    <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                  <div key={content.id} className="min-w-0 overflow-hidden rounded-md border px-3 py-2">
+                    <div className="grid min-w-0 gap-2 sm:grid-cols-[1fr_auto] sm:items-start">
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">
                           {content.title}
@@ -288,12 +288,12 @@ function AssetBatchSection({ batch }: { batch: AssetBatchItem }) {
     <Card>
       <CardHeader>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <div>
+          <div className="min-w-0">
             <CardTitle className="flex items-center gap-2">
               <PackageOpen className="size-4 text-primary" />
               {batch.name}
             </CardTitle>
-            <CardDescription className="mt-2">
+            <CardDescription className="mt-2 break-words">
               {batch.description ?? "暂无批次说明。"}
             </CardDescription>
           </div>
@@ -306,7 +306,7 @@ function AssetBatchSection({ batch }: { batch: AssetBatchItem }) {
       </CardHeader>
       <CardContent>
         {batch.assets.length > 0 ? (
-          <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid min-w-0 grid-cols-[repeat(auto-fill,minmax(min(100%,32rem),32rem))] justify-start gap-4">
             {batch.assets.map((asset) => (
               <AssetTile key={asset.id} asset={asset} />
             ))}

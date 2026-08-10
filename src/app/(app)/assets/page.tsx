@@ -161,8 +161,8 @@ function AssetTile({ asset }: { asset: BatchAssetItem }) {
   const usage = getUsageSummary(asset.generatedContents);
 
   return (
-    <div className="grid min-h-[28rem] grid-rows-[auto_1fr] rounded-md border bg-background">
-      <div className="flex items-start justify-between gap-3 border-b bg-muted/35 p-3">
+    <div className="grid min-h-[28rem] min-w-0 grid-rows-[auto_1fr] overflow-hidden rounded-md border bg-background">
+      <div className="flex min-w-0 items-start justify-between gap-3 border-b bg-muted/35 p-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground">
             <AssetIcon type={asset.type} status={asset.status} />
@@ -184,12 +184,12 @@ function AssetTile({ asset }: { asset: BatchAssetItem }) {
         </div>
       </div>
 
-      <div className="flex flex-col justify-between gap-4 p-4">
-        <div className="space-y-4">
-          <div className="flex flex-wrap gap-2">
+      <div className="flex min-w-0 flex-col justify-between gap-4 p-4">
+        <div className="min-w-0 space-y-4">
+          <div className="flex min-w-0 flex-wrap gap-2">
             {asset.tags.length > 0 ? (
               asset.tags.map((tag) => (
-                <Badge key={tag} variant="outline">
+                <Badge key={tag} variant="outline" className="max-w-full break-words">
                   {tag}
                 </Badge>
               ))
@@ -198,11 +198,11 @@ function AssetTile({ asset }: { asset: BatchAssetItem }) {
             )}
           </div>
 
-          <p className="text-sm leading-6 text-muted-foreground">
+          <p className="break-words text-sm leading-6 text-muted-foreground">
             {getAssetDescription(asset)}
           </p>
 
-          <div className="grid gap-2 text-xs text-muted-foreground">
+          <div className="grid min-w-0 gap-2 break-words text-xs text-muted-foreground">
             {asset.productName ? <p>产品：{asset.productName}</p> : null}
             {asset.scene ? <p>场景：{asset.scene}</p> : null}
             {asset.visualStyle ? <p>风格：{asset.visualStyle}</p> : null}
@@ -216,24 +216,27 @@ function AssetTile({ asset }: { asset: BatchAssetItem }) {
 
           <Separator />
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3 text-sm">
+          <div className="min-w-0 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
               <span className="font-medium">内容使用情况</span>
-              <Badge variant={usage.isPublished ? "default" : "outline"}>
+              <Badge
+                variant={usage.isPublished ? "default" : "outline"}
+                className="shrink-0"
+              >
                 {usage.isPublished ? "已发布：是" : "已发布：否"}
               </Badge>
             </div>
 
             {asset.generatedContents.length > 0 ? (
-              <div className="space-y-2">
+              <div className="min-w-0 space-y-2">
                 {asset.generatedContents.slice(0, 4).map((content) => (
-                  <div key={content.id} className="rounded-md border px-3 py-2">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
+                  <div key={content.id} className="min-w-0 rounded-md border px-3 py-2">
+                    <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">
                           {content.title}
                         </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
+                        <p className="mt-1 break-words text-xs text-muted-foreground">
                           {content.platforms
                             .map((platform) => platformLabels[platform])
                             .join("，") || "未设置平台"}
@@ -243,6 +246,7 @@ function AssetTile({ asset }: { asset: BatchAssetItem }) {
                         variant={
                           isPublishedUsage(content) ? "default" : "secondary"
                         }
+                        className="shrink-0"
                       >
                         {isPublishedUsage(content)
                           ? "已发布"
@@ -265,7 +269,7 @@ function AssetTile({ asset }: { asset: BatchAssetItem }) {
           </div>
         </div>
 
-        <div className="grid gap-3">
+        <div className="grid min-w-0 gap-3">
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground">
               手动修改素材状态
@@ -302,7 +306,7 @@ function AssetBatchSection({ batch }: { batch: AssetBatchItem }) {
       </CardHeader>
       <CardContent>
         {batch.assets.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {batch.assets.map((asset) => (
               <AssetTile key={asset.id} asset={asset} />
             ))}

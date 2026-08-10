@@ -60,13 +60,13 @@ export function AssetStatusSelect({
   }
 
   return (
-    <div className="space-y-1">
+    <div className="min-w-0 space-y-1">
       <Select
         value={value}
         onValueChange={(nextStatus) => handleChange(nextStatus as AssetStatus)}
         disabled={isSaving}
       >
-        <SelectTrigger className="h-8 w-full">
+        <SelectTrigger className="h-8 w-full min-w-0">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

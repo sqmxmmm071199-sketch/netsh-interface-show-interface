@@ -50,9 +50,9 @@ export function AssetAnalyzeButton({ assetId }: { assetId: string }) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2">
       <Button
-        className="w-full"
+        className="w-full min-w-0"
         type="button"
         variant="secondary"
         disabled={isAnalyzing}

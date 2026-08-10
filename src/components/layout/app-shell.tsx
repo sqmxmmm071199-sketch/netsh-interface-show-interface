@@ -83,6 +83,7 @@ function Sidebar({
             width={32}
             height={32}
             className="size-7 object-contain"
+            unoptimized
             priority
           />
         </div>

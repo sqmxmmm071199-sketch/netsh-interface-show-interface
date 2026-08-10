@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -13,7 +14,6 @@ import {
   MessageSquareText,
   Plus,
   Settings,
-  Sparkles,
   UserSquare2,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -62,6 +62,8 @@ const navItems = [
   { href: "/settings", labelKey: "settings", icon: Settings },
 ] as const;
 
+const brandLogoSrc = "/yunque-logo.png";
+
 function Sidebar({
   pathname,
   copy,
@@ -74,8 +76,15 @@ function Sidebar({
   return (
     <aside className="flex h-full w-64 flex-col border-r bg-white">
       <div className="flex h-16 items-center gap-3 border-b px-5">
-        <div className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          <Sparkles className="size-5" />
+        <div className="flex size-9 items-center justify-center rounded-md border bg-white p-1 shadow-sm">
+          <Image
+            src={brandLogoSrc}
+            alt={copy.appName}
+            width={32}
+            height={32}
+            className="size-7 object-contain"
+            priority
+          />
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{copy.appName}</p>

@@ -84,16 +84,34 @@ const generatedContentVariantsSchema = {
   items: contentVariantSchema,
 };
 
+export function getPrimaryCreativeRequest(marketingGoal: string) {
+  return (
+    marketingGoal
+      .split(/\n+\s*补充营销目标：/)
+      .at(0)
+      ?.trim() || marketingGoal.trim()
+  );
+}
+
 export function buildContentGenerationPrompt(
   input: ContentGenerationPromptInput,
 ): AiPrompt {
+  const primaryUserRequest = getPrimaryCreativeRequest(input.marketingGoal);
+
   return {
     system:
-      "你是资深社媒营销内容策略师和品牌文案创作者。你会严格基于品牌档案、长期记忆和素材信息生成平台原生内容。必须输出 JSON 数组，不要输出 Markdown、解释文字或代码块。",
+      "你是资深社媒营销内容策略师和品牌文案创作者。用户原始创作需求是最高优先级；品牌档案、长期记忆和素材信息只用于补充语调、约束和可用素材，不能覆盖或替换用户指定的主题、产品或任务。必须输出 JSON 数组，不要输出 Markdown、解释文字或代码块。",
     user: JSON.stringify(
       {
-        task: "根据品牌上下文、用户选择的素材和生成配置，生成可保存到 GeneratedContent 的社媒营销内容变体。",
+        task: "优先根据 primaryUserRequest 生成可保存到 GeneratedContent 的社媒营销内容变体，再结合品牌上下文、用户选择的素材和生成配置做风格与合规适配。",
+        primaryUserRequest,
+        priorityRules: [
+          "primaryUserRequest 是本次创作的主任务，标题、hook、正文、CTA 和素材建议必须围绕它展开。",
+          "如果 primaryUserRequest 只是一个名词或短词，例如「苹果」，必须把它当作本次内容主题或产品，不要擅自替换成品牌档案里的其他产品。",
+          "BrandProfile 和 brandMemories 只用于保持品牌语调、禁用表达、平台经验和合规边界；当它们与 primaryUserRequest 冲突时，以 primaryUserRequest 为主题，以品牌信息为表达风格参考。",
+        ],
         constraints: [
+          "必须显式回应用户输入的主题、产品或任务，不得生成与用户输入无关的内容。",
           "必须符合目标平台和内容类型，不要泛泛而谈。",
           "必须尽量利用 selectedAssets 中的素材描述、场景、视觉风格和建议用途。",
           "必须遵守 BrandProfile 中的禁用词、禁用营销表达和品牌语调。",

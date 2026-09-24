@@ -20,6 +20,7 @@ import {
 } from "@/lib/prompts/asset-analysis";
 import {
   buildContentGenerationPrompt,
+  getPrimaryCreativeRequest,
   type ContentGenerationPromptInput,
   type GeneratedContentVariant,
 } from "@/lib/prompts/content-generation";
@@ -411,9 +412,11 @@ export function createContentGenerationFallback(
   const assetNames = input.selectedAssets
     .map((asset) => asset.fileName || asset.productName)
     .filter(Boolean);
+  const primaryRequest =
+    getPrimaryCreativeRequest(input.marketingGoal) || "提升品牌内容表现";
   const productName =
     input.selectedAssets.find((asset) => asset.productName)?.productName ||
-    "主推产品";
+    primaryRequest;
   const goal = input.marketingGoal || "提升品牌内容表现";
   const memorySummary = input.brandMemories
     .slice()
@@ -424,10 +427,12 @@ export function createContentGenerationFallback(
     const variantNumber = index + 1;
 
     return {
-      title: `${input.platformLabel} ${input.contentTypeLabel}草稿 ${variantNumber}`,
-      hook: `如果你正在寻找更轻松的${productName}使用灵感，这条内容可以先收藏。`,
+      title: `${input.platformLabel} ${productName}内容草稿 ${variantNumber}`,
+      hook: `如果你正在寻找关于${productName}的内容灵感，这条可以先收藏。`,
       body: [
-        `围绕「${goal}」，这条内容建议从真实使用场景切入。`,
+        `围绕你的需求「${primaryRequest}」，这条内容建议从真实使用场景切入。`,
+        `可以先把${productName}放进一个具体场景：它解决了什么小问题、带来什么体验、为什么值得被记住。`,
+        goal !== primaryRequest ? `补充目标：${goal}` : "",
         input.tone ? `整体语气保持${input.tone}。` : "整体表达保持清晰、可信和克制。",
         assetNames.length > 0
           ? `可参考素材：${assetNames.slice(0, 3).join("、")}。`
@@ -439,11 +444,13 @@ export function createContentGenerationFallback(
       ]
         .filter(Boolean)
         .join("\n\n"),
-      hashtags: ["品牌内容", "新品灵感", input.platformLabel].filter(Boolean),
-      cta: "保存这条灵感，后续发布前再结合素材微调。",
+      hashtags: [productName, "品牌内容", "新品灵感", input.platformLabel].filter(
+        Boolean,
+      ),
+      cta: `如果你也在关注${productName}，可以先保存这条灵感，发布前再结合素材微调。`,
       visualSuggestion:
         input.selectedAssets[0]?.suggestedUse ||
-        "优先选择清晰展示产品或使用场景的素材作为首图/开场镜头。",
+        `优先选择清晰展示${productName}外观、细节或使用场景的素材作为首图/开场镜头。`,
       platformNotes: `${input.platformLabel} 内容需要适配 ${input.contentTypeLabel} 的浏览节奏，发布前检查标题、首屏信息和行动号召。`,
     };
   });

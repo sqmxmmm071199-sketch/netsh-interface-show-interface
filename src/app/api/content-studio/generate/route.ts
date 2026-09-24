@@ -20,11 +20,12 @@ import {
 } from "@/lib/labels";
 import { logError } from "@/lib/logger";
 import type { ComplianceCheckPromptInput } from "@/lib/prompts/compliance-check";
-import type {
-  ContentGenerationAssetInput,
-  ContentGenerationMemoryInput,
-  ContentGenerationPromptInput,
-  GeneratedContentVariant,
+import {
+  getPrimaryCreativeRequest,
+  type ContentGenerationAssetInput,
+  type ContentGenerationMemoryInput,
+  type ContentGenerationPromptInput,
+  type GeneratedContentVariant,
 } from "@/lib/prompts/content-generation";
 import { prisma } from "@/lib/prisma";
 import {
@@ -104,6 +105,49 @@ function normalizeGeneratedVariants(
     .map((variant) => generatedContentVariantSchema.safeParse(variant))
     .filter((result) => result.success)
     .map((result) => result.data);
+}
+
+function normalizeTopicText(value: string) {
+  return value.toLowerCase().replace(/\s+/g, "");
+}
+
+function getRequiredTopic(marketingGoal: string) {
+  const primaryRequest = getPrimaryCreativeRequest(marketingGoal);
+  const compactRequest = normalizeTopicText(primaryRequest);
+
+  if (!compactRequest) return null;
+
+  if (
+    /^[\u4e00-\u9fa5A-Za-z0-9_-]{2,12}$/.test(compactRequest) &&
+    !/^(文案|内容|脚本|种草|新品|发布|短视频|生成|写文案|写内容)$/.test(
+      compactRequest,
+    )
+  ) {
+    return primaryRequest.trim();
+  }
+
+  const topicMatch = compactRequest.match(
+    /(?:关于|围绕|以)([\u4e00-\u9fa5A-Za-z0-9_-]{2,12})(?:写|生成|创作|做|为|的|$)/,
+  );
+
+  return topicMatch?.[1] ?? null;
+}
+
+function variantMentionsTopic(variant: GeneratedContentVariant, topic: string) {
+  const normalizedTopic = normalizeTopicText(topic);
+  const content = normalizeTopicText(
+    [
+      variant.title,
+      variant.hook,
+      variant.body,
+      variant.cta,
+      variant.visualSuggestion,
+      variant.platformNotes,
+      ...variant.hashtags,
+    ].join("\n"),
+  );
+
+  return content.includes(normalizedTopic);
 }
 
 function buildComplianceInput({
@@ -271,8 +315,16 @@ export async function POST(request: Request) {
     })();
 
     const normalizedVariants = normalizeGeneratedVariants(result.data);
+    const requiredTopic = getRequiredTopic(values.marketingGoal);
+    const topicMatched =
+      !requiredTopic ||
+      normalizedVariants.some((variant) =>
+        variantMentionsTopic(variant, requiredTopic),
+      );
+    const useFallbackForTopicMismatch =
+      normalizedVariants.length > 0 && !topicMatched;
     const generatedVariants =
-      normalizedVariants.length > 0
+      normalizedVariants.length > 0 && topicMatched
         ? normalizedVariants
         : createContentGenerationFallback(promptInput);
 
@@ -287,7 +339,9 @@ export async function POST(request: Request) {
         message: isAiConfigured()
           ? result.parsed
             ? normalizedVariants.length > 0
-              ? `${getAiProviderLabel()} 内容已生成，并已完成合规检查。`
+              ? useFallbackForTopicMismatch && requiredTopic
+                ? `${getAiProviderLabel()} 返回内容未覆盖「${requiredTopic}」，已自动生成与需求一致的基础草稿并完成合规检查。`
+                : `${getAiProviderLabel()} 内容已生成，并已完成合规检查。`
               : `${getAiProviderLabel()} 返回内容结构不完整，已返回基础生成结果并完成合规检查。`
             : `${result.error ?? `${getAiProviderLabel()} 返回格式不完整，已返回基础生成结果。`}已完成合规检查。`
           : `未配置 ${getAiProviderLabel()} API Key，已返回本地基础生成结果并完成合规检查。`,

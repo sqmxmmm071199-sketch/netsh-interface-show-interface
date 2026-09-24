@@ -96,15 +96,50 @@ function getForbiddenClaims(brandProfile: {
   return brandProfile?.forbiddenClaims ?? [];
 }
 
+const internalCopyLeakPatterns = [
+  "围绕你的需求",
+  "这条内容建议",
+  "额外要求",
+  "用户没有",
+  "请根据需求",
+  "请基于品牌",
+  "build this content around",
+  "no asset is selected",
+  "the draft has considered",
+  "additional requirements have been considered",
+];
+
+function variantHasInternalCopyLeak(variant: GeneratedContentVariant) {
+  const content = [
+    variant.title,
+    variant.hook,
+    variant.body,
+    variant.cta,
+    variant.visualSuggestion,
+    variant.platformNotes,
+    ...variant.hashtags,
+  ]
+    .join("\n")
+    .toLowerCase();
+
+  return internalCopyLeakPatterns.some((pattern) => content.includes(pattern));
+}
+
 function normalizeGeneratedVariants(
   value: unknown,
 ): GeneratedContentVariant[] {
   if (!Array.isArray(value)) return [];
 
   return value
-    .map((variant) => generatedContentVariantSchema.safeParse(variant))
-    .filter((result) => result.success)
-    .map((result) => result.data);
+    .flatMap((variant) => {
+      const result = generatedContentVariantSchema.safeParse(variant);
+
+      if (!result.success || variantHasInternalCopyLeak(result.data)) {
+        return [];
+      }
+
+      return [result.data];
+    });
 }
 
 function normalizeTopicText(value: string) {

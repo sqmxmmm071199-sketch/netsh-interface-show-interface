@@ -406,6 +406,42 @@ export async function generateAssetAnalysis({
   );
 }
 
+function getFallbackCopyProfile(productName: string) {
+  const normalized = productName.toLowerCase();
+
+  if (/沙发|家具|sofa|furniture|leather/.test(normalized)) {
+    return {
+      zhScene: "客厅、会客区或午后放松的角落",
+      zhSensory: "细腻触感、稳重轮廓和耐看的线条",
+      zhBenefit: "让空间多一点沉稳、舒适和不过度张扬的高级感",
+      enScene: "the living room, a hosting corner, or a quiet afternoon at home",
+      enSensory: "refined texture, a grounded silhouette, and timeless lines",
+      enBenefit:
+        "adds comfort, calm, and understated quality to the whole space",
+    };
+  }
+
+  if (/苹果|果汁|juice|apple|drink|饮品|饮料/.test(normalized)) {
+    return {
+      zhScene: "早餐、通勤路上或午后补充状态的片刻",
+      zhSensory: "清爽果香、明亮口感和轻负担的日常感",
+      zhBenefit: "让简单的一口也变得更有精神、更容易被记住",
+      enScene: "breakfast, a commute, or a quick afternoon refresh",
+      enSensory: "bright fruit notes, a clean taste, and an easy everyday feel",
+      enBenefit: "turns a small sip into a refreshing moment people remember",
+    };
+  }
+
+  return {
+    zhScene: "真实的日常使用场景",
+    zhSensory: "清晰卖点、细节质感和直观体验",
+    zhBenefit: "让用户更快理解它为什么值得选择",
+    enScene: "a real everyday use case",
+    enSensory: "clear selling points, thoughtful details, and a tangible feel",
+    enBenefit: "helps people quickly understand why it is worth choosing",
+  };
+}
+
 export function createContentGenerationFallback(
   input: ContentGenerationPromptInput,
 ): GeneratedContentVariant[] {
@@ -417,11 +453,6 @@ export function createContentGenerationFallback(
   const productName =
     input.selectedAssets.find((asset) => asset.productName)?.productName ||
     primaryRequest;
-  const goal = input.marketingGoal || "提升品牌内容表现";
-  const memorySummary = input.brandMemories
-    .slice()
-    .sort((a, b) => b.importance - a.importance)
-    .slice(0, 3);
   const englishWithChinese = input.outputLanguage === "EN_WITH_ZH";
   const platformEnglishLabels: Record<string, string> = {
     INSTAGRAM: "Instagram",
@@ -442,54 +473,51 @@ export function createContentGenerationFallback(
     platformEnglishLabels[input.platform] ?? input.platformLabel;
   const englishContentTypeLabel =
     contentTypeEnglishLabels[input.contentType] ?? input.contentTypeLabel;
-  const englishTone =
-    input.tone && !/[\u4e00-\u9fa5]/.test(input.tone)
-      ? input.tone
-      : "fresh, trustworthy, and restrained";
+  const copyProfile = getFallbackCopyProfile(productName);
 
   return Array.from({ length: Math.max(1, input.numberOfVariants) }, (_, index) => {
     const variantNumber = index + 1;
+    const zhTitle =
+      variantNumber % 2 === 0
+        ? `${productName}，把质感放进日常`
+        : `${productName}，一眼感受到高级质感`;
+    const zhHook =
+      variantNumber % 2 === 0
+        ? `真正耐看的品质，往往藏在日常细节里。`
+        : `好的${productName}，不需要用力证明自己。`;
+    const zhBody = [
+      `${productName}适合出现在${copyProfile.zhScene}。`,
+      `它给人的直观感受，是${copyProfile.zhSensory}。不是夸张地抢镜，而是让人靠近之后愿意多看一眼、多停留一会儿。`,
+      `如果你想要的是${copyProfile.zhBenefit}，这会是一个很自然的选择。`,
+      assetNames.length > 0
+        ? `发布时可以结合这组素材展示细节：${assetNames.slice(0, 3).join("、")}。`
+        : `发布时建议补充一张清晰的场景图或细节图，让卖点更直观。`,
+    ].join("\n\n");
+    const zhCta = `想让${productName}更贴近日常场景，可以先收藏这条灵感，发布前再配上真实素材。`;
 
     if (englishWithChinese) {
       const englishBody = [
-        `Build this content around the user's request: "${primaryRequest}". Start from a concrete usage scene so the idea feels specific and easy to adapt.`,
-        `Put ${productName} into one clear moment: what small problem it solves, what feeling it creates, and why people should remember it.`,
-        `Keep the tone ${englishTone}, and write naturally in English.`,
+        `${productName} fits naturally into ${copyProfile.enScene}.`,
+        `The first thing people notice is ${copyProfile.enSensory}. It does not need to shout; it simply makes the moment feel more considered.`,
+        `For anyone looking for something that ${copyProfile.enBenefit}, this is an easy detail to remember.`,
         assetNames.length > 0
           ? `Reference assets: ${assetNames.slice(0, 3).join(", ")}.`
-          : "No asset is selected yet, so this draft uses the brand profile and brand memory as context.",
-        memorySummary.length > 0
-          ? `The draft has considered ${memorySummary.length} high-priority brand memories for tone, content rules, and compliance boundaries.`
-          : "",
-        input.extraInstructions
-          ? "Additional requirements have been considered in this draft."
-          : "",
-      ]
-        .filter(Boolean)
-        .join("\n\n");
-      const chineseBody = [
-        `围绕你的需求「${primaryRequest}」创作，从具体使用场景切入，让内容更明确、更容易改写。`,
-        `可以先把${productName}放进一个清晰场景：它解决了什么小问题、带来什么体验、为什么值得被记住。`,
-        input.tone ? `整体语气保持${input.tone}。` : "整体表达保持清晰、可信和克制。",
-        assetNames.length > 0
-          ? `可参考素材：${assetNames.slice(0, 3).join("、")}。`
-          : "当前未选择素材，可先用品牌档案和品牌记忆生成基础草稿。",
-        input.extraInstructions ? "已参考额外要求生成这条草稿。" : "",
+          : "Before publishing, pair this copy with a clean product detail or lifestyle image.",
       ]
         .filter(Boolean)
         .join("\n\n");
 
       return {
-        title: `${productName} content draft ${variantNumber} / ${productName}内容草稿 ${variantNumber}`,
-        hook: `If you're looking for a fresh content angle around ${productName}, save this idea first.\n中文对照：如果你正在寻找关于${productName}的新内容角度，可以先收藏这条灵感。`,
-        body: `${englishBody}\n\n中文对照：\n${chineseBody}`,
+        title: `${productName}: quiet quality for everyday moments / ${zhTitle}`,
+        hook: `Good ${productName} does not need to prove itself loudly.\n中文对照：${zhHook}`,
+        body: `${englishBody}\n\n中文对照：\n${zhBody}`,
         hashtags: [
           productName,
           "brand content",
           "product story",
           englishPlatformLabel,
         ].filter(Boolean),
-        cta: `Save this idea and refine it with your real assets before publishing.\n中文对照：先保存这条灵感，发布前再结合真实素材微调。`,
+        cta: `Save this idea and pair it with real product visuals before publishing.\n中文对照：${zhCta}`,
         visualSuggestion:
           `Use a clean visual that clearly shows ${productName}, its details, or a believable usage scene.\n中文对照：优先选择清晰展示${productName}外观、细节或使用场景的素材。`,
         platformNotes:
@@ -498,27 +526,13 @@ export function createContentGenerationFallback(
     }
 
     return {
-      title: `${input.platformLabel} ${productName}内容草稿 ${variantNumber}`,
-      hook: `如果你正在寻找关于${productName}的内容灵感，这条可以先收藏。`,
-      body: [
-        `围绕你的需求「${primaryRequest}」，这条内容建议从真实使用场景切入。`,
-        `可以先把${productName}放进一个具体场景：它解决了什么小问题、带来什么体验、为什么值得被记住。`,
-        goal !== primaryRequest ? `补充目标：${goal}` : "",
-        input.tone ? `整体语气保持${input.tone}。` : "整体表达保持清晰、可信和克制。",
-        assetNames.length > 0
-          ? `可参考素材：${assetNames.slice(0, 3).join("、")}。`
-          : "当前未选择素材，可先用品牌档案信息生成基础文案。",
-        memorySummary.length > 0
-          ? `已参考 ${memorySummary.length} 条高重要度品牌记忆，表达会优先保持品牌语调、内容规则和合规边界。`
-          : "",
-        input.extraInstructions ? `额外要求：${input.extraInstructions}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n\n"),
+      title: zhTitle,
+      hook: zhHook,
+      body: zhBody,
       hashtags: [productName, "品牌内容", "新品灵感", input.platformLabel].filter(
         Boolean,
       ),
-      cta: `如果你也在关注${productName}，可以先保存这条灵感，发布前再结合素材微调。`,
+      cta: zhCta,
       visualSuggestion:
         input.selectedAssets[0]?.suggestedUse ||
         `优先选择清晰展示${productName}外观、细节或使用场景的素材作为首图/开场镜头。`,
@@ -644,7 +658,6 @@ const absolutePromisePatterns = [
   "100%",
   "保证",
   "最佳",
-  "第一",
   "治愈",
   "根治",
   "零风险",

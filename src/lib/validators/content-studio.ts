@@ -1,6 +1,10 @@
 import { ContentType, Platform } from "@prisma/client";
 import { z } from "zod";
 
+export const contentOutputLanguageSchema = z
+  .enum(["ZH_CN", "EN_WITH_ZH"])
+  .default("ZH_CN");
+
 export const contentGenerationFormSchema = z.object({
   platform: z.nativeEnum(Platform),
   contentType: z.nativeEnum(ContentType),
@@ -8,17 +12,18 @@ export const contentGenerationFormSchema = z.object({
   selectedAssets: z.array(z.string().min(1)).max(12).default([]),
   tone: z.string().trim().max(120).default(""),
   numberOfVariants: z.coerce.number().int().min(1).max(5).default(3),
+  outputLanguage: contentOutputLanguageSchema,
   extraInstructions: z.string().trim().max(1000).default(""),
 });
 
 export const generatedContentVariantSchema = z.object({
-  title: z.string().trim().min(1).max(160),
-  hook: z.string().trim().min(1).max(500),
-  body: z.string().trim().min(1).max(5000),
+  title: z.string().trim().min(1).max(240),
+  hook: z.string().trim().min(1).max(800),
+  body: z.string().trim().min(1).max(8000),
   hashtags: z.array(z.string().trim().min(1).max(80)).max(16).default([]),
-  cta: z.string().trim().min(1).max(500),
-  visualSuggestion: z.string().trim().min(1).max(1000),
-  platformNotes: z.string().trim().min(1).max(1000),
+  cta: z.string().trim().min(1).max(800),
+  visualSuggestion: z.string().trim().min(1).max(1500),
+  platformNotes: z.string().trim().min(1).max(1500),
 });
 
 export const complianceCheckResultSchema = z.object({
@@ -59,6 +64,7 @@ export const addGeneratedContentToCalendarSchema = z.object({
 export type ContentGenerationFormValues = z.infer<
   typeof contentGenerationFormSchema
 >;
+export type ContentOutputLanguage = z.infer<typeof contentOutputLanguageSchema>;
 export type GeneratedContentVariantValues = z.infer<
   typeof generatedContentVariantWithComplianceSchema
 >;

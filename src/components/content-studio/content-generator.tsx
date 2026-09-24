@@ -51,6 +51,7 @@ import {
 import type { ComplianceCheckResult } from "@/lib/prompts/compliance-check";
 import type {
   ContentGenerationFormValues,
+  ContentOutputLanguage,
   GeneratedContentVariantValues,
 } from "@/lib/validators/content-studio";
 
@@ -116,6 +117,16 @@ const contentTypeOptions = [
   "AD_COPY",
 ] as ContentType[];
 
+const outputLanguageOptions = [
+  { value: "ZH_CN", label: "中文" },
+  { value: "EN_WITH_ZH", label: "英文 + 中文对照" },
+] as const;
+
+const outputLanguageLabels: Record<ContentOutputLanguage, string> = {
+  ZH_CN: "中文",
+  EN_WITH_ZH: "英文 + 中文对照",
+};
+
 const defaultForm: ContentGenerationFormValues = {
   platform: "XIAOHONGSHU",
   contentType: "POST",
@@ -123,6 +134,7 @@ const defaultForm: ContentGenerationFormValues = {
   selectedAssets: [],
   tone: "清爽、可信、克制，像朋友分享真实体验",
   numberOfVariants: 3,
+  outputLanguage: "ZH_CN",
   extraInstructions: "",
 };
 
@@ -132,6 +144,10 @@ function isPlatform(value: string): value is Platform {
 
 function isContentType(value: string): value is ContentType {
   return (contentTypeOptions as readonly string[]).includes(value);
+}
+
+function isOutputLanguage(value: string): value is ContentOutputLanguage {
+  return outputLanguageOptions.some((option) => option.value === value);
 }
 
 function validateGenerationForm(
@@ -146,6 +162,7 @@ function validateGenerationForm(
   const extraInstructions = values.extraInstructions.trim();
   const numberOfVariants = Number(values.numberOfVariants);
   const selectedAssets = values.selectedAssets.filter(Boolean).slice(0, 12);
+  const outputLanguage = String(values.outputLanguage);
 
   if (!isPlatform(platform)) {
     return { ok: false, message: "请选择生成平台。" };
@@ -179,6 +196,10 @@ function validateGenerationForm(
     return { ok: false, message: "额外要求最多 1000 个字。" };
   }
 
+  if (!isOutputLanguage(outputLanguage)) {
+    return { ok: false, message: "请选择输出语言。" };
+  }
+
   return {
     ok: true,
     data: {
@@ -188,6 +209,7 @@ function validateGenerationForm(
       selectedAssets,
       tone,
       numberOfVariants,
+      outputLanguage,
       extraInstructions,
     },
   };
@@ -924,6 +946,27 @@ export function ContentGenerator({
                           </select>
                         </label>
 
+                        <label className="space-y-2 text-sm font-medium">
+                          输出语言
+                          <select
+                            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                            value={form.outputLanguage}
+                            onChange={(event) =>
+                              updateForm(
+                                "outputLanguage",
+                                event.target.value as ContentOutputLanguage,
+                              )
+                            }
+                            disabled={isGenerating}
+                          >
+                            {outputLanguageOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
                         <label className="space-y-2 text-sm font-medium md:col-span-2">
                           营销目标
                           <Input
@@ -1055,6 +1098,14 @@ export function ContentGenerator({
                               {contentTypeLabels[
                                 lastGenerationForm?.contentType ?? form.contentType
                               ]}
+                            </Badge>
+                            <Badge variant="outline">
+                              {
+                                outputLanguageLabels[
+                                  lastGenerationForm?.outputLanguage ??
+                                    form.outputLanguage
+                                ]
+                              }
                             </Badge>
                             <Badge
                               variant={getRiskBadgeVariant(riskLevel)}

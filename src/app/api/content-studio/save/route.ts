@@ -81,6 +81,7 @@ export async function POST(request: Request) {
           tone: values.tone,
           platformLabel: platformLabels[values.platform],
           contentTypeLabel: contentTypeLabels[values.contentType],
+          outputLanguage: values.outputLanguage,
           source: "content-studio",
         },
         riskNotes: variant.complianceCheck ?? Prisma.JsonNull,

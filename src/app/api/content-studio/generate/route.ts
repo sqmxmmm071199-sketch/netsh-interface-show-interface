@@ -284,6 +284,7 @@ export async function POST(request: Request) {
       marketingGoal: values.marketingGoal,
       tone: values.tone,
       numberOfVariants: values.numberOfVariants,
+      outputLanguage: values.outputLanguage,
       extraInstructions: values.extraInstructions,
     };
 

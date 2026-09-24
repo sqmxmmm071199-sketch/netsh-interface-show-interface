@@ -422,9 +422,80 @@ export function createContentGenerationFallback(
     .slice()
     .sort((a, b) => b.importance - a.importance)
     .slice(0, 3);
+  const englishWithChinese = input.outputLanguage === "EN_WITH_ZH";
+  const platformEnglishLabels: Record<string, string> = {
+    INSTAGRAM: "Instagram",
+    TIKTOK: "TikTok",
+    FACEBOOK: "Facebook",
+    PINTEREST: "Pinterest",
+    LINKEDIN: "LinkedIn",
+    XIAOHONGSHU: "Xiaohongshu",
+  };
+  const contentTypeEnglishLabels: Record<string, string> = {
+    POST: "single-image post",
+    CAROUSEL: "carousel post",
+    SHORT_VIDEO_SCRIPT: "short-form video script",
+    STORY: "story",
+    AD_COPY: "ad copy",
+  };
+  const englishPlatformLabel =
+    platformEnglishLabels[input.platform] ?? input.platformLabel;
+  const englishContentTypeLabel =
+    contentTypeEnglishLabels[input.contentType] ?? input.contentTypeLabel;
+  const englishTone =
+    input.tone && !/[\u4e00-\u9fa5]/.test(input.tone)
+      ? input.tone
+      : "fresh, trustworthy, and restrained";
 
   return Array.from({ length: Math.max(1, input.numberOfVariants) }, (_, index) => {
     const variantNumber = index + 1;
+
+    if (englishWithChinese) {
+      const englishBody = [
+        `Build this content around the user's request: "${primaryRequest}". Start from a concrete usage scene so the idea feels specific and easy to adapt.`,
+        `Put ${productName} into one clear moment: what small problem it solves, what feeling it creates, and why people should remember it.`,
+        `Keep the tone ${englishTone}, and write naturally in English.`,
+        assetNames.length > 0
+          ? `Reference assets: ${assetNames.slice(0, 3).join(", ")}.`
+          : "No asset is selected yet, so this draft uses the brand profile and brand memory as context.",
+        memorySummary.length > 0
+          ? `The draft has considered ${memorySummary.length} high-priority brand memories for tone, content rules, and compliance boundaries.`
+          : "",
+        input.extraInstructions
+          ? "Additional requirements have been considered in this draft."
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      const chineseBody = [
+        `围绕你的需求「${primaryRequest}」创作，从具体使用场景切入，让内容更明确、更容易改写。`,
+        `可以先把${productName}放进一个清晰场景：它解决了什么小问题、带来什么体验、为什么值得被记住。`,
+        input.tone ? `整体语气保持${input.tone}。` : "整体表达保持清晰、可信和克制。",
+        assetNames.length > 0
+          ? `可参考素材：${assetNames.slice(0, 3).join("、")}。`
+          : "当前未选择素材，可先用品牌档案和品牌记忆生成基础草稿。",
+        input.extraInstructions ? "已参考额外要求生成这条草稿。" : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
+      return {
+        title: `${productName} content draft ${variantNumber} / ${productName}内容草稿 ${variantNumber}`,
+        hook: `If you're looking for a fresh content angle around ${productName}, save this idea first.\n中文对照：如果你正在寻找关于${productName}的新内容角度，可以先收藏这条灵感。`,
+        body: `${englishBody}\n\n中文对照：\n${chineseBody}`,
+        hashtags: [
+          productName,
+          "brand content",
+          "product story",
+          englishPlatformLabel,
+        ].filter(Boolean),
+        cta: `Save this idea and refine it with your real assets before publishing.\n中文对照：先保存这条灵感，发布前再结合真实素材微调。`,
+        visualSuggestion:
+          `Use a clean visual that clearly shows ${productName}, its details, or a believable usage scene.\n中文对照：优先选择清晰展示${productName}外观、细节或使用场景的素材。`,
+        platformNotes:
+          `${englishPlatformLabel} content should match the browsing rhythm of a ${englishContentTypeLabel}; check the first-screen hook, title clarity, and CTA before publishing.\n中文对照：${input.platformLabel} 内容需要适配 ${input.contentTypeLabel} 的浏览节奏，发布前检查标题、首屏信息和行动号召。`,
+      };
+    }
 
     return {
       title: `${input.platformLabel} ${productName}内容草稿 ${variantNumber}`,

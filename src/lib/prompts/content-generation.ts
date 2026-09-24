@@ -35,6 +35,7 @@ export type ContentGenerationPromptInput = {
   marketingGoal: string;
   tone: string;
   numberOfVariants: number;
+  outputLanguage?: "ZH_CN" | "EN_WITH_ZH";
   extraInstructions?: string | null;
 };
 
@@ -97,6 +98,18 @@ export function buildContentGenerationPrompt(
   input: ContentGenerationPromptInput,
 ): AiPrompt {
   const primaryUserRequest = getPrimaryCreativeRequest(input.marketingGoal);
+  const outputLanguage = input.outputLanguage ?? "ZH_CN";
+  const languageRules =
+    outputLanguage === "EN_WITH_ZH"
+      ? [
+          "所有用户可见文案字段必须先输出英文，包括 title、hook、body、cta、visualSuggestion、platformNotes。",
+          "每个长文案字段都要追加中文对照，并使用清晰标签「中文对照：」。",
+          "title 可以使用「English title / 中文标题」格式；body 可以先给完整英文正文，再给「中文对照：」后的完整中文译文。",
+          "hashtags 优先输出英文标签，可补充 1-3 个中文标签用于对照。",
+        ]
+      : [
+          "所有用户可见文案字段必须使用中文，平台名和必要英文标签可以保留英文。",
+        ];
 
   return {
     system:
@@ -119,7 +132,7 @@ export function buildContentGenerationPrompt(
           "如果品牌信息不足，请用谨慎、可执行的表达，不要编造具体事实。",
           "hashtags 使用短标签，建议 3-8 个。",
           "生成数量必须等于 numberOfVariants。",
-          "所有内容使用中文，平台名和必要英文标签可以保留英文。",
+          ...languageRules,
         ],
         requiredOutputShape: [
           {
@@ -133,7 +146,10 @@ export function buildContentGenerationPrompt(
           },
         ],
         input,
-        outputLanguage: "zh-CN",
+        outputLanguage:
+          outputLanguage === "EN_WITH_ZH"
+            ? "English first, with Chinese reference"
+            : "zh-CN",
       },
       null,
       2,

@@ -109,16 +109,32 @@ function stripCodeFence(value: string) {
     .trim();
 }
 
-function extractJsonCandidate(value: string) {
+function extractJsonCandidate(value: string, preferArray = false) {
   const clean = stripCodeFence(value);
   if (clean.startsWith("{") && clean.endsWith("}")) return clean;
   if (clean.startsWith("[") && clean.endsWith("]")) return clean;
+
+  if (preferArray) {
+    const arrayStart = clean.indexOf("[");
+    const arrayEnd = clean.lastIndexOf("]");
+
+    if (arrayStart >= 0 && arrayEnd > arrayStart) {
+      return clean.slice(arrayStart, arrayEnd + 1);
+    }
+  }
 
   const objectStart = clean.indexOf("{");
   const objectEnd = clean.lastIndexOf("}");
 
   if (objectStart >= 0 && objectEnd > objectStart) {
     return clean.slice(objectStart, objectEnd + 1);
+  }
+
+  const arrayStart = clean.indexOf("[");
+  const arrayEnd = clean.lastIndexOf("]");
+
+  if (arrayStart >= 0 && arrayEnd > arrayStart) {
+    return clean.slice(arrayStart, arrayEnd + 1);
   }
 
   return clean;
@@ -129,8 +145,16 @@ export function parseJsonWithFallback<T>(
   fallback: T,
 ): GenerateJsonResult<T> {
   try {
+    const parsed = JSON.parse(
+      extractJsonCandidate(raw, Array.isArray(fallback)),
+    ) as T;
+
+    if (Array.isArray(fallback) !== Array.isArray(parsed)) {
+      throw new Error("JSON root type does not match the expected shape.");
+    }
+
     return {
-      data: JSON.parse(extractJsonCandidate(raw)) as T,
+      data: parsed,
       raw,
       parsed: true,
     };
@@ -391,12 +415,10 @@ export function createContentGenerationFallback(
     input.selectedAssets.find((asset) => asset.productName)?.productName ||
     "主推产品";
   const goal = input.marketingGoal || "提升品牌内容表现";
-  const memoryHints = input.brandMemories
+  const memorySummary = input.brandMemories
     .slice()
     .sort((a, b) => b.importance - a.importance)
-    .slice(0, 3)
-    .map((memory) => `${memory.type}：${memory.content}`)
-    .filter(Boolean);
+    .slice(0, 3);
 
   return Array.from({ length: Math.max(1, input.numberOfVariants) }, (_, index) => {
     const variantNumber = index + 1;
@@ -410,8 +432,8 @@ export function createContentGenerationFallback(
         assetNames.length > 0
           ? `可参考素材：${assetNames.slice(0, 3).join("、")}。`
           : "当前未选择素材，可先用品牌档案信息生成基础文案。",
-        memoryHints.length > 0
-          ? `长期品牌记忆：${memoryHints.join("；")}。`
+        memorySummary.length > 0
+          ? `已参考 ${memorySummary.length} 条高重要度品牌记忆，表达会优先保持品牌语调、内容规则和合规边界。`
           : "",
         input.extraInstructions ? `额外要求：${input.extraInstructions}` : "",
       ]

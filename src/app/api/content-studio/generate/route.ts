@@ -27,7 +27,10 @@ import type {
   GeneratedContentVariant,
 } from "@/lib/prompts/content-generation";
 import { prisma } from "@/lib/prisma";
-import { contentGenerationFormSchema } from "@/lib/validators/content-studio";
+import {
+  contentGenerationFormSchema,
+  generatedContentVariantSchema,
+} from "@/lib/validators/content-studio";
 
 export const runtime = "nodejs";
 
@@ -90,6 +93,17 @@ function getForbiddenClaims(brandProfile: {
   forbiddenClaims?: string[] | null;
 } | null) {
   return brandProfile?.forbiddenClaims ?? [];
+}
+
+function normalizeGeneratedVariants(
+  value: unknown,
+): GeneratedContentVariant[] {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((variant) => generatedContentVariantSchema.safeParse(variant))
+    .filter((result) => result.success)
+    .map((result) => result.data);
 }
 
 function buildComplianceInput({
@@ -256,8 +270,14 @@ export async function POST(request: Request) {
       }
     })();
 
+    const normalizedVariants = normalizeGeneratedVariants(result.data);
+    const generatedVariants =
+      normalizedVariants.length > 0
+        ? normalizedVariants
+        : createContentGenerationFallback(promptInput);
+
     const variantsWithCompliance = await checkGeneratedVariants({
-      variants: result.data.slice(0, values.numberOfVariants),
+      variants: generatedVariants.slice(0, values.numberOfVariants),
       values,
       brandProfile,
     });
@@ -266,7 +286,9 @@ export async function POST(request: Request) {
       {
         message: isAiConfigured()
           ? result.parsed
-            ? `${getAiProviderLabel()} 内容已生成，并已完成合规检查。`
+            ? normalizedVariants.length > 0
+              ? `${getAiProviderLabel()} 内容已生成，并已完成合规检查。`
+              : `${getAiProviderLabel()} 返回内容结构不完整，已返回基础生成结果并完成合规检查。`
             : `${result.error ?? `${getAiProviderLabel()} 返回格式不完整，已返回基础生成结果。`}已完成合规检查。`
           : `未配置 ${getAiProviderLabel()} API Key，已返回本地基础生成结果并完成合规检查。`,
         parsed: result.parsed,

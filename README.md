@@ -76,7 +76,7 @@ seed 会创建 mock 用户、workspace、品牌档案、素材、生成内容和
 | --- | --- | --- |
 | `DATABASE_URL` | 是 | PostgreSQL 连接字符串，Prisma runtime 使用。 |
 | `DIRECT_URL` | 否 | 数据库提供商给出的直连地址。使用连接池时，可在受控迁移流程中使用它。当前 schema 未强制依赖。 |
-| `AI_PROVIDER` | AI 功能必填 | AI 服务提供方，可选 `openai` 或 `deepseek`。 |
+| `AI_PROVIDER` | AI 功能必填 | AI 服务提供方，可选 `openai`、`deepseek` 或 `mock`。`mock` 仅返回本地兜底内容。 |
 | `OPENAI_API_KEY` | 使用 OpenAI 时必填 | OpenAI API key。不要提交真实 key。 |
 | `OPENAI_MODEL` | 否 | 覆盖默认 OpenAI 模型。未设置时使用代码中的默认值。 |
 | `DEEPSEEK_API_KEY` | 使用 DeepSeek 时必填 | DeepSeek API key。不要提交真实 key。 |

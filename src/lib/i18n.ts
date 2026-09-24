@@ -45,6 +45,11 @@ export const i18nCopy = {
       replyAssistant: "回复助手",
       settings: "设置",
     },
+    navGroups: {
+      core: "主流程",
+      tools: "工具",
+      system: "系统",
+    },
     settings: {
       eyebrow: "设置",
       title: "工作区设置",
@@ -100,6 +105,11 @@ export const i18nCopy = {
       insights: "Insights",
       replyAssistant: "Reply Assistant",
       settings: "Settings",
+    },
+    navGroups: {
+      core: "Main workflow",
+      tools: "Tools",
+      system: "System",
     },
     settings: {
       eyebrow: "Settings",

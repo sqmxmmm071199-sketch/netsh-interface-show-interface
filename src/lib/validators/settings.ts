@@ -8,6 +8,8 @@ export const workspaceSettingsSchema = z.object({
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "只能使用小写字母、数字和单个连字符。")
     .min(3)
     .max(60),
+  defaultBrandName: z.string().trim().max(80).optional(),
+  defaultLanguage: z.enum(["zh-CN", "en-US"]).optional(),
 });
 
 export type WorkspaceSettingsValues = z.infer<typeof workspaceSettingsSchema>;

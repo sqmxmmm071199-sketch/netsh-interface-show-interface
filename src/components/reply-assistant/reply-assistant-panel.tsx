@@ -24,7 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast-provider";
 import { getApiErrorMessage, parseApiPayload } from "@/lib/client-api";
@@ -108,10 +107,10 @@ export function ReplyAssistantPanel() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MessageSquareReply className="size-4 text-primary" />
-            回复配置
+            输入客户消息
           </CardTitle>
           <CardDescription>
-            输入客户评论或私信，选择场景后生成品牌口径回复建议。
+            粘贴一条评论或私信，选择场景后生成品牌口径回复。
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -204,29 +203,14 @@ export function ReplyAssistantPanel() {
                 </p>
               </div>
 
-              <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-amber-900">
+              <div className="rounded-md border bg-muted/30 p-4">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <ShieldAlert className="size-4" />
                   风险提醒
                 </div>
-                <p className="mt-2 text-sm leading-6">{suggestion.riskNotes}</p>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-3">
-                <p className="text-sm font-medium">其他版本</p>
-                {suggestion.alternativeReplies.map((reply, index) => (
-                  <div key={`${reply}-${index}`} className="rounded-md border p-4">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <Badge variant="outline">版本 {index + 1}</Badge>
-                      <CopyButton text={reply} />
-                    </div>
-                    <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
-                      {reply}
-                    </p>
-                  </div>
-                ))}
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  {suggestion.riskNotes}
+                </p>
               </div>
             </>
           ) : (

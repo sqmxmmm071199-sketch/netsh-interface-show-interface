@@ -1,6 +1,14 @@
 import OpenAI from "openai";
 import type { ResponseInputMessageContentList } from "openai/resources/responses/responses";
 import {
+  defaultDeepSeekBaseURL,
+  getAiProvider as resolveAiProvider,
+  getAiProviderLabel as resolveAiProviderLabel,
+  getAiProviderModel,
+  isAiProviderConfigured,
+  type AiProvider,
+} from "@/lib/ai/provider";
+import {
   buildBrandProfilePrompt,
   type BrandProfileAnalysis,
   type BrandProfilePromptInput,
@@ -40,44 +48,26 @@ type GenerateJsonOptions<T> = {
   model?: string;
 };
 
-export type AiProvider = "openai" | "deepseek";
-
-const defaultOpenAIModel = "gpt-5.5";
-const defaultDeepSeekModel = "deepseek-chat";
-const defaultDeepSeekBaseURL = "https://api.deepseek.com";
-
 const globalForAI = globalThis as unknown as {
   openai?: OpenAI;
   deepseek?: OpenAI;
 };
 
 export function getAiProvider(): AiProvider {
-  const configuredProvider = process.env.AI_PROVIDER?.toLowerCase();
-
-  if (configuredProvider === "deepseek") return "deepseek";
-  if (configuredProvider === "openai") return "openai";
-  if (process.env.DEEPSEEK_API_KEY && !process.env.OPENAI_API_KEY) {
-    return "deepseek";
-  }
-
-  return "openai";
+  return resolveAiProvider();
 }
 
 export function getAiProviderLabel() {
-  return getAiProvider() === "deepseek" ? "DeepSeek" : "OpenAI";
+  return resolveAiProviderLabel();
 }
 
 export function isAiConfigured() {
-  return getAiProvider() === "deepseek"
-    ? Boolean(process.env.DEEPSEEK_API_KEY)
-    : Boolean(process.env.OPENAI_API_KEY);
+  return isAiProviderConfigured();
 }
 
 export function getConfiguredAiModel(model?: string) {
   if (model) return model;
-  return getAiProvider() === "deepseek"
-    ? process.env.DEEPSEEK_MODEL || defaultDeepSeekModel
-    : process.env.OPENAI_MODEL || defaultOpenAIModel;
+  return getAiProviderModel();
 }
 
 export function getOpenAIClient() {
@@ -210,12 +200,23 @@ async function generateDeepSeekJson<T>({
   return parseJsonWithFallback(raw, fallback);
 }
 
+function generateMockJson<T>(fallback: T): GenerateJsonResult<T> {
+  return {
+    data: fallback,
+    raw: JSON.stringify(fallback),
+    parsed: true,
+  };
+}
+
 export async function generateJson<T>(
   options: GenerateJsonOptions<T>,
 ): Promise<GenerateJsonResult<T>> {
-  return getAiProvider() === "deepseek"
-    ? generateDeepSeekJson(options)
-    : generateOpenAIJson(options);
+  const provider = getAiProvider();
+
+  if (provider === "mock") return generateMockJson(options.fallback);
+  if (provider === "deepseek") return generateDeepSeekJson(options);
+
+  return generateOpenAIJson(options);
 }
 
 export function createBrandProfileAnalysisFallback(
@@ -304,7 +305,14 @@ export async function generateAssetAnalysis({
   input: AssetAnalysisPromptInput;
   imageDataUrl?: string | null;
 }) {
-  if (getAiProvider() === "deepseek") {
+  const provider = getAiProvider();
+
+  if (provider === "mock") {
+    const fallback = createAssetAnalysisFallback(input);
+    return generateMockJson(fallback);
+  }
+
+  if (provider === "deepseek") {
     const promptInput = imageDataUrl
       ? {
           ...input,
@@ -431,7 +439,7 @@ export function createInsightsFallback(input: InsightsPromptInput): InsightsResu
   const commonType = input.metrics.mostCommonContentType ?? "暂无明确类型";
 
   return {
-    monthlySummary: `${input.monthLabel}，${input.workspaceName} 共生成 ${input.metrics.generatedContentCount} 条内容，计划发布 ${input.metrics.plannedPublishCount} 条，已发布 ${input.metrics.publishedCount} 条。当前素材侧还有 ${input.metrics.unusedAssetCount} 个未使用素材、${input.metrics.usedAssetCount} 个已使用素材；最常出现的平台是 ${topPlatform}，最常见内容类型是 ${commonType}。这些结论只基于系统内数据，不包含真实社媒平台表现。`,
+    monthlySummary: `${input.monthLabel}，${input.workspaceName} 共生成 ${input.metrics.generatedContentCount} 条内容，计划发布 ${input.metrics.plannedPublishCount} 条，已发布 ${input.metrics.publishedCount} 条，还有 ${input.metrics.unplannedContentCount} 条内容未加入日历。当前素材侧还有 ${input.metrics.unusedAssetCount} 个未使用素材、${input.metrics.usedAssetCount} 个已使用素材；最常出现的平台是 ${topPlatform}，最常见内容类型是 ${commonType}。这些结论只基于系统内数据，不包含真实社媒平台表现。`,
     assetSuggestions:
       input.metrics.unusedAssetCount > 0
         ? [
@@ -448,7 +456,9 @@ export function createInsightsFallback(input: InsightsPromptInput): InsightsResu
         ? `复盘本月 ${input.metrics.generatedContentCount} 条生成内容，把表现稳定的标题结构和 CTA 写入品牌记忆。`
         : "本月生成内容偏少，建议先围绕 3 个核心营销目标建立内容主题池。",
       `当前最常见内容类型是 ${commonType}，下月可以增加其他内容类型来降低表达单一性。`,
-      "把已保存但未排期的内容加入内容日历，形成更连续的发布节奏。",
+      input.metrics.unplannedContentCount > 0
+        ? `把 ${input.metrics.unplannedContentCount} 条已保存但未排期的内容加入内容日历，形成更连续的发布节奏。`
+        : "已保存内容基本都有日历计划，下月重点放在发布状态维护和复盘沉淀。",
     ],
     platformSuggestions: [
       input.metrics.topPlatform
@@ -469,7 +479,9 @@ export function createInsightsFallback(input: InsightsPromptInput): InsightsResu
     nextMonthPlan: [
       "先确定下月 3-5 个主题，再为每个主题选择素材、生成内容、加入日历。",
       "每周至少沉淀 1 条品牌记忆，把运营复盘变成后续 AI 生成的长期上下文。",
-      "优先补齐未使用素材的内容消化计划，并把高风险内容安排在发布前复核。",
+      input.metrics.unplannedContentCount > 0
+        ? "先把未加入日历的内容安排到下月发布节奏中，再补充新内容。"
+        : "优先补齐未使用素材的内容消化计划，并把高风险内容安排在发布前复核。",
     ],
   };
 }

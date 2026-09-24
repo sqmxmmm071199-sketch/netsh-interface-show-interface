@@ -13,3 +13,11 @@ export const createCalendarItemSchema = z.object({
 export const updateCalendarItemStatusSchema = z.object({
   status: z.nativeEnum(ContentStatus),
 });
+
+export const updateCalendarItemSchema = z.object({
+  plannedDate: z.string().trim().min(1, "请选择发布日期。"),
+  plannedTime: z.string().trim().min(1, "请选择发布时间。"),
+  platform: z.nativeEnum(Platform),
+  topic: z.string().trim().min(1, "请填写内容主题。").max(160),
+  notes: z.string().trim().max(1000).default(""),
+});

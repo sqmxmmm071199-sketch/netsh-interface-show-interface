@@ -5,6 +5,7 @@ import {
 import { BrandProfileQuestionnaire } from "@/components/brand-profile/brand-profile-questionnaire";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   listToCommaText,
   platformPreferencesToText,
@@ -68,31 +69,43 @@ export default async function BrandProfilePage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Brand Profile"
-        title="品牌档案问卷"
-        description="保存品牌问卷后，可以使用 AI 生成品牌总结、内容方向、平台建议和营销注意事项。"
+        title="品牌档案"
+        description="让 AI 了解你的品牌基础信息、语调规则、内容方向和长期记忆。"
       />
 
-      <BrandProfileQuestionnaire
-        workspaceName={data.workspace.name}
-        initialValues={initialValues}
-        initialAnalysis={
-          profile
-            ? {
-                brandSummary: profile.brandSummary,
-                targetAudienceSummary: profile.targetAudienceSummary,
-                toneOfVoice: profile.toneOfVoice,
-                contentAngles: profile.contentAngles,
-                forbiddenClaims: profile.forbiddenClaims,
-                recommendedPlatforms: profile.recommendedPlatforms,
-                marketingSuggestions: profile.marketingSuggestions,
-                aiAnalysisUpdatedAt:
-                  profile.aiAnalysisUpdatedAt?.toISOString() ?? null,
-              }
-            : null
-        }
-      />
+      <Tabs defaultValue="profile" className="space-y-6">
+        <TabsList className="w-full justify-start overflow-x-auto sm:w-auto">
+          <TabsTrigger value="profile">品牌档案</TabsTrigger>
+          <TabsTrigger value="memory">品牌记忆</TabsTrigger>
+        </TabsList>
 
-      <BrandMemoryManager initialMemories={memories} />
+        <TabsContent value="profile" className="mt-0">
+          <BrandProfileQuestionnaire
+            workspaceName={data.workspace.name}
+            initialValues={initialValues}
+            hasSavedProfile={Boolean(profile)}
+            initialAnalysis={
+              profile
+                ? {
+                    brandSummary: profile.brandSummary,
+                    targetAudienceSummary: profile.targetAudienceSummary,
+                    toneOfVoice: profile.toneOfVoice,
+                    contentAngles: profile.contentAngles,
+                    forbiddenClaims: profile.forbiddenClaims,
+                    recommendedPlatforms: profile.recommendedPlatforms,
+                    marketingSuggestions: profile.marketingSuggestions,
+                    aiAnalysisUpdatedAt:
+                      profile.aiAnalysisUpdatedAt?.toISOString() ?? null,
+                  }
+                : null
+            }
+          />
+        </TabsContent>
+
+        <TabsContent value="memory" className="mt-0">
+          <BrandMemoryManager initialMemories={memories} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

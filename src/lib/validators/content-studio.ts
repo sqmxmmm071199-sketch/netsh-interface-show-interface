@@ -4,7 +4,7 @@ import { z } from "zod";
 export const contentGenerationFormSchema = z.object({
   platform: z.nativeEnum(Platform),
   contentType: z.nativeEnum(ContentType),
-  marketingGoal: z.string().trim().min(2, "请填写营销目标。").max(300),
+  marketingGoal: z.string().trim().min(2, "请填写营销目标。").max(800),
   selectedAssets: z.array(z.string().min(1)).max(12).default([]),
   tone: z.string().trim().max(120).default(""),
   numberOfVariants: z.coerce.number().int().min(1).max(5).default(3),

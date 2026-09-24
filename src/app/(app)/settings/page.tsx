@@ -2,7 +2,7 @@ import { SettingsContent } from "@/components/settings/settings-content";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { requireCurrentWorkspace } from "@/lib/auth/current-workspace";
-import { getAiProviderLabel } from "@/services/ai";
+import { getAiProviderPublicStatus } from "@/lib/ai/provider";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +30,9 @@ export default async function SettingsPage() {
       workspace={{
         name: current.data.workspace.name,
         slug: current.data.workspace.slug,
+        brandName: current.data.workspace.brandProfile?.brandName ?? "",
       }}
-      aiProviderLabel={getAiProviderLabel()}
+      aiStatus={getAiProviderPublicStatus()}
     />
   );
 }

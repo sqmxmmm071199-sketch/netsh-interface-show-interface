@@ -25,6 +25,7 @@ export type InsightsPromptInput = {
     generatedContentCount: number;
     plannedPublishCount: number;
     publishedCount: number;
+    unplannedContentCount: number;
     topPlatform: string | null;
     topPlatformCount: number;
     unusedAssetCount: number;

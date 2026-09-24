@@ -10,10 +10,12 @@ import {
   FileImage,
   Lightbulb,
   LogOut,
+  type LucideIcon,
   Menu,
   MessageSquareText,
   Plus,
   Settings,
+  Sparkles,
   UserSquare2,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -51,18 +53,63 @@ type AppShellWorkspace = {
   name: string;
 };
 
-const navItems = [
-  { href: "/dashboard", labelKey: "dashboard", icon: BarChart3 },
+type NavLabelKey = keyof ReturnType<typeof getI18nCopy>["nav"];
+type NavGroupKey = keyof ReturnType<typeof getI18nCopy>["navGroups"];
+
+type NavItem = {
+  href: string;
+  labelKey: NavLabelKey;
+  icon: LucideIcon;
+};
+
+type NavSection = {
+  labelKey: NavGroupKey;
+  items: NavItem[];
+};
+
+const dashboardNavItem: NavItem = {
+  href: "/dashboard",
+  labelKey: "dashboard",
+  icon: BarChart3,
+};
+
+const coreNavItems: NavItem[] = [
+  dashboardNavItem,
   { href: "/brand-profile", labelKey: "brandProfile", icon: UserSquare2 },
   { href: "/assets", labelKey: "assets", icon: FileImage },
-  { href: "/content-studio", labelKey: "contentStudio", icon: MessageSquareText },
+  { href: "/content-studio", labelKey: "contentStudio", icon: Sparkles },
   { href: "/calendar", labelKey: "calendar", icon: CalendarDays },
   { href: "/insights", labelKey: "insights", icon: Lightbulb },
-  { href: "/reply-assistant", labelKey: "replyAssistant", icon: MessageSquareText },
-  { href: "/settings", labelKey: "settings", icon: Settings },
-] as const;
+];
+
+const navSections: NavSection[] = [
+  {
+    labelKey: "core",
+    items: coreNavItems,
+  },
+  {
+    labelKey: "tools",
+    items: [
+      {
+        href: "/reply-assistant",
+        labelKey: "replyAssistant",
+        icon: MessageSquareText,
+      },
+    ],
+  },
+  {
+    labelKey: "system",
+    items: [{ href: "/settings", labelKey: "settings", icon: Settings }],
+  },
+];
+
+const allNavItems = navSections.flatMap((section) => section.items);
 
 const brandLogoSrc = "/yunque-logo.png";
+
+function isActivePath(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 function Sidebar({
   pathname,
@@ -93,29 +140,36 @@ function Sidebar({
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-4">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = pathname === item.href;
-          const label = copy.nav[item.labelKey];
+      <nav className="flex-1 space-y-5 px-3 py-4">
+        {navSections.map((section) => (
+          <div key={section.labelKey} className="space-y-1">
+            <p className="px-3 pb-1 text-xs font-medium text-muted-foreground">
+              {copy.navGroups[section.labelKey]}
+            </p>
+            {section.items.map((item) => {
+              const Icon = item.icon;
+              const active = isActivePath(pathname, item.href);
+              const label = copy.nav[item.labelKey];
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onNavigate}
-              className={cn(
-                "flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors",
-                active
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              <Icon className="size-4" />
-              <span>{label}</span>
-            </Link>
-          );
-        })}
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={cn(
+                    "flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors",
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  <Icon className="size-4" />
+                  <span>{label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       <Separator />
@@ -149,7 +203,8 @@ export function AppShell({
   const copy = getI18nCopy(language);
   const [open, setOpen] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
-  const current = navItems.find((item) => item.href === pathname) ?? navItems[0];
+  const current =
+    allNavItems.find((item) => item.href === pathname) ?? allNavItems[0];
   const currentLabel = copy.nav[current.labelKey];
   const currentWorkspace =
     workspaces.find((workspace) => workspace.id === currentWorkspaceId) ??

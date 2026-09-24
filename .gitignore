@@ -3,12 +3,14 @@ node_modules
 
 # next
 .next
+tsconfig.tsbuildinfo
 out
 
 # production
 build
 
 # local runtime data
+.local/
 data/
 logs/*
 !logs/.gitkeep

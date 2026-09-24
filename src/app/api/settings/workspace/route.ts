@@ -23,6 +23,8 @@ async function parseSettingsRequest(request: Request) {
       data: {
         name: String(formData.get("name") ?? ""),
         slug: String(formData.get("slug") ?? ""),
+        defaultBrandName: String(formData.get("defaultBrandName") ?? ""),
+        defaultLanguage: String(formData.get("defaultLanguage") ?? ""),
       },
       isFormRequest,
     };
@@ -93,6 +95,19 @@ export async function POST(request: Request) {
       },
     });
 
+    if (values.defaultBrandName?.trim()) {
+      await prisma.brandProfile.upsert({
+        where: { workspaceId: current.data.workspace.id },
+        create: {
+          workspaceId: current.data.workspace.id,
+          brandName: values.defaultBrandName.trim(),
+        },
+        update: {
+          brandName: values.defaultBrandName.trim(),
+        },
+      });
+    }
+
     if (isFormRequest) {
       return redirectToPath("/settings");
     }
@@ -101,6 +116,7 @@ export async function POST(request: Request) {
       {
         message: "工作区设置已保存。",
         workspace,
+        defaultLanguage: values.defaultLanguage ?? null,
       },
       "settings/workspace",
       { workspaceId: workspace.id },

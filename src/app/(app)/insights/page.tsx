@@ -1,15 +1,17 @@
 import {
-  Archive,
-  BarChart3,
+  AlertTriangle,
   CalendarDays,
   CheckCircle2,
-  FileWarning,
+  FileText,
+  Lightbulb,
   Megaphone,
+  MessageSquareReply,
   PackageOpen,
   ShieldAlert,
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
 import {
   createInsightsFallback,
   generateInsights,
@@ -19,6 +21,7 @@ import {
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -26,9 +29,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import {
-  assetStatusLabels,
   contentStatusLabels,
   contentTypeLabels,
   platformLabels,
@@ -37,11 +38,6 @@ import { logError } from "@/lib/logger";
 import { getInsightsData } from "@/services/db/current-workspace";
 
 export const dynamic = "force-dynamic";
-
-function percent(value: number, total: number) {
-  if (total <= 0) return "0%";
-  return `${Math.max(6, Math.round((value / total) * 100))}%`;
-}
 
 function StatCard({
   title,
@@ -82,7 +78,7 @@ function StatCard({
   );
 }
 
-function SuggestionList({
+function AdviceSection({
   title,
   items,
   icon: Icon,
@@ -92,40 +88,11 @@ function SuggestionList({
   icon: LucideIcon;
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Icon className="size-4 text-primary" />
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {items.length > 0 ? (
-          <div className="space-y-3">
-            {items.map((item) => (
-              <div key={item} className="rounded-md border bg-background p-3">
-                <p className="text-sm leading-6 text-muted-foreground">{item}</p>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">暂无建议。</p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function SuggestionBlock({
-  title,
-  items,
-}: {
-  title: string;
-  items: string[];
-}) {
-  return (
-    <div className="rounded-md border bg-muted/20 p-4">
-      <p className="text-sm font-medium">{title}</p>
+    <div className="rounded-md border bg-background p-4">
+      <div className="flex items-center gap-2">
+        <Icon className="size-4 text-primary" />
+        <p className="text-sm font-medium">{title}</p>
+      </div>
       {items.length > 0 ? (
         <div className="mt-3 space-y-2">
           {items.map((item) => (
@@ -141,6 +108,31 @@ function SuggestionBlock({
   );
 }
 
+function ReminderCard({
+  title,
+  description,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Icon className="size-4 text-primary" />
+          {title}
+        </CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
+}
+
 export default async function InsightsPage() {
   const result = await getInsightsData();
   const data = result.data;
@@ -151,13 +143,50 @@ export default async function InsightsPage() {
         <PageHeader
           eyebrow="Insights"
           title="运营建议"
-          description="连接数据库后，这里会读取当前 workspace 的月度运营数据。"
+          description="基于当前系统内数据生成简单、可执行的运营建议。"
         />
         <EmptyState
           title="暂无统计数据"
           description={
             result.error ??
-            "请先执行 seed，或为当前 workspace 创建内容资产。"
+            "请先上传素材、生成内容，并把内容加入日历后再查看运营建议。"
+          }
+        />
+      </div>
+    );
+  }
+
+  const hasOperationalData =
+    data.stats.assetCount > 0 ||
+    data.stats.contentCount > 0 ||
+    data.stats.calendarItemCount > 0;
+
+  if (!hasOperationalData) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow="Insights"
+          title={`${data.workspace.name} 运营建议`}
+          description="这里不会展示虚构数据；先沉淀素材和内容后，AI 才能给出可靠建议。"
+        />
+        <EmptyState
+          title="还没有可分析的数据"
+          description="请先上传第一批素材，并在内容生成页保存至少一条内容。之后这里会基于系统内数据生成建议。"
+          action={
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button asChild>
+                <Link href="/assets">
+                  <PackageOpen className="size-4" />
+                  上传素材
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/content-studio">
+                  <Sparkles className="size-4" />
+                  生成内容
+                </Link>
+              </Button>
+            </div>
           }
         />
       </div>
@@ -171,31 +200,32 @@ export default async function InsightsPage() {
       })
     : null;
   const insights = aiResult?.data ?? createInsightsFallback(data.insightsInput);
-  const topPlatformLabel = data.topPlatform
-    ? platformLabels[data.topPlatform.platform]
-    : "暂无平台";
-  const topContentTypeLabel = data.topContentType
-    ? contentTypeLabels[data.topContentType.contentType]
-    : "暂无类型";
 
   const statCards = [
     {
       title: "本月生成内容",
       value: data.stats.monthlyGeneratedContentCount,
-      hint: `内容库累计 ${data.stats.contentCount} 条`,
+      hint: "来自 GeneratedContent.createdAt",
       icon: Megaphone,
     },
     {
-      title: "本月计划发布",
+      title: "已计划内容",
       value: data.stats.monthlyPlannedPublishCount,
-      hint: `日历累计 ${data.stats.calendarItemCount} 条`,
+      hint: "来自本月 ContentCalendarItem",
       icon: CalendarDays,
     },
     {
-      title: "本月已发布",
+      title: "已发布内容",
       value: data.stats.monthlyPublishedCount,
       hint: "仅统计系统内发布标记",
       icon: CheckCircle2,
+    },
+    {
+      title: "未使用素材",
+      value: data.stats.unusedAssetCount,
+      hint: "来自 Asset.status = UNUSED",
+      icon: PackageOpen,
+      tone: data.stats.unusedAssetCount > 0 ? "warning" : "default",
     },
     {
       title: "高风险内容",
@@ -204,35 +234,6 @@ export default async function InsightsPage() {
       icon: ShieldAlert,
       tone: data.stats.highRiskContentCount > 0 ? "warning" : "default",
     },
-    {
-      title: "使用最多平台",
-      value: topPlatformLabel,
-      hint: data.topPlatform
-        ? `${data.topPlatform.count} 次使用`
-        : "本月暂无平台数据",
-      icon: BarChart3,
-    },
-    {
-      title: "最常见内容类型",
-      value: topContentTypeLabel,
-      hint: data.topContentType
-        ? `${data.topContentType.count} 次出现`
-        : "本月暂无内容类型数据",
-      icon: Archive,
-    },
-    {
-      title: "未使用素材",
-      value: data.stats.unusedAssetCount,
-      hint: `素材累计 ${data.stats.assetCount} 个`,
-      icon: PackageOpen,
-      tone: data.stats.unusedAssetCount > 0 ? "warning" : "default",
-    },
-    {
-      title: "已使用素材",
-      value: data.stats.usedAssetCount,
-      hint: "由发布标记或手动状态维护",
-      icon: Sparkles,
-    },
   ] as const;
 
   return (
@@ -240,141 +241,182 @@ export default async function InsightsPage() {
       <PageHeader
         eyebrow="Insights"
         title={`${data.workspace.name} 运营建议`}
-        description={`${data.monthLabel} 月度总结。MVP 阶段仅基于系统内数据，不连接真实社媒平台表现。`}
+        description={`${data.monthLabel}，仅基于 BrandProfile、素材、内容、日历和品牌记忆生成。`}
+        action={
+          <Button asChild variant="outline">
+            <Link href="/reply-assistant">
+              <MessageSquareReply className="size-4" />
+              生成评论/私信回复
+            </Link>
+          </Button>
+        }
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {statCards.map((card) => (
-          <StatCard key={card.title} {...card} />
-        ))}
-      </div>
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">本月概览</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            这些数字全部来自当前 workspace 的数据库记录，不包含真实社媒平台表现。
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          {statCards.map((card) => (
+            <StatCard key={card.title} {...card} />
+          ))}
+        </div>
+      </section>
 
-      <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="size-4 text-primary" />
-                  AI 月度总结
-                </CardTitle>
-                <CardDescription>
-                  基于 BrandProfile、素材、内容、日历和 BrandMemory 生成。
-                </CardDescription>
-              </div>
-              <Badge variant={aiResult?.parsed ? "default" : "secondary"}>
-                {isAiConfigured()
-                  ? aiResult?.parsed
-                    ? `${getAiProviderLabel()} JSON`
-                    : `${getAiProviderLabel()} fallback`
-                  : "本地 fallback"}
-              </Badge>
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Lightbulb className="size-4 text-primary" />
+                AI 运营建议
+              </CardTitle>
+              <CardDescription>
+                AI 输入只包含系统内统计、样本内容、品牌档案和品牌记忆。
+              </CardDescription>
             </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm leading-7 text-muted-foreground">
+            <Badge variant={aiResult?.parsed ? "default" : "secondary"}>
+              {isAiConfigured()
+                ? aiResult?.parsed
+                  ? `${getAiProviderLabel()} JSON`
+                  : `${getAiProviderLabel()} fallback`
+                : "本地 fallback"}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="rounded-md border bg-muted/20 p-4">
+            <p className="text-sm font-medium">本月总结</p>
+            <p className="mt-3 text-sm leading-7 text-muted-foreground">
               {insights.monthlySummary}
             </p>
-            <Separator className="my-5" />
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-md border bg-background p-4">
-                <p className="text-sm text-muted-foreground">品牌记忆</p>
-                <p className="mt-2 text-lg font-semibold">
-                  {data.stats.activeMemoryCount} 条
-                </p>
-              </div>
-              <div className="rounded-md border bg-background p-4">
-                <p className="text-sm text-muted-foreground">素材利用</p>
-                <p className="mt-2 text-lg font-semibold">
-                  {data.stats.usedAssetCount}/{data.stats.assetCount}
-                </p>
-              </div>
-              <div className="rounded-md border bg-background p-4">
-                <p className="text-sm text-muted-foreground">主要平台</p>
-                <p className="mt-2 text-lg font-semibold">{topPlatformLabel}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarDays className="size-4 text-primary" />
-              下月建议
-            </CardTitle>
-            <CardDescription>把总结转成可执行的排期动作。</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {insights.nextMonthPlan.map((item) => (
-                <div key={item} className="rounded-md border bg-background p-3">
-                  <p className="text-sm leading-6 text-muted-foreground">{item}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <AdviceSection
+              title="素材使用建议"
+              items={insights.assetSuggestions}
+              icon={PackageOpen}
+            />
+            <AdviceSection
+              title="内容方向建议"
+              items={insights.contentSuggestions}
+              icon={Megaphone}
+            />
+            <AdviceSection
+              title="平台建议"
+              items={insights.platformSuggestions}
+              icon={CalendarDays}
+            />
+            <AdviceSection
+              title="风险提醒"
+              items={insights.riskSuggestions}
+              icon={ShieldAlert}
+            />
+          </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <PackageOpen className="size-4 text-primary" />
-              未使用素材提醒
-            </CardTitle>
-            <CardDescription>
-              当前还有 {data.stats.unusedAssetCount} 个素材尚未进入已使用状态。
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+          <AdviceSection
+            title="下月建议"
+            items={insights.nextMonthPlan}
+            icon={Sparkles}
+          />
+        </CardContent>
+      </Card>
+
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold">待处理提醒</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            优先处理这些项目，可以让内容资产更快进入发布节奏。
+          </p>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-3">
+          <ReminderCard
+            title="未使用素材"
+            description={`当前还有 ${data.stats.unusedAssetCount} 个素材未使用。`}
+            icon={PackageOpen}
+          >
             {data.unusedAssetSamples.length > 0 ? (
               <div className="space-y-2">
                 {data.unusedAssetSamples.map((asset) => (
-                  <div
-                    key={asset.id}
-                    className="flex items-center justify-between gap-3 rounded-md border p-3"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {asset.fileName ?? asset.title}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {asset.tags.slice(0, 3).join("，") || "暂无标签"}
-                      </p>
-                    </div>
-                    <Badge variant="secondary">{assetStatusLabels.UNUSED}</Badge>
+                  <div key={asset.id} className="rounded-md border p-3">
+                    <p className="truncate text-sm font-medium">
+                      {asset.fileName ?? asset.title}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {asset.tags.slice(0, 3).join("，") || "暂无标签"}
+                    </p>
                   </div>
                 ))}
+                <Button asChild size="sm" variant="outline" className="mt-2">
+                  <Link href="/assets">查看素材库</Link>
+                </Button>
               </div>
             ) : (
-              <div className="rounded-md border border-dashed p-5 text-sm text-muted-foreground">
-                当前没有未使用素材。
+              <div className="flex items-center gap-2 rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                <CheckCircle2 className="size-4" />
+                暂无未使用素材。
               </div>
             )}
-            <SuggestionBlock title="素材建议" items={insights.assetSuggestions} />
-          </CardContent>
-        </Card>
+          </ReminderCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileWarning className="size-4 text-primary" />
-              高风险内容提醒
-            </CardTitle>
-            <CardDescription>
-              仅统计本月生成内容中合规检查为 high 的内容。
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+          <ReminderCard
+            title="未加入日历的内容"
+            description={`当前还有 ${data.stats.unplannedContentCount} 条内容未加入日历。`}
+            icon={FileText}
+          >
+            {data.unplannedContentSamples.length > 0 ? (
+              <div className="space-y-2">
+                {data.unplannedContentSamples.map((content) => (
+                  <div key={content.id} className="rounded-md border p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {content.title}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {contentTypeLabels[content.type]} ·{" "}
+                          {content.platforms
+                            .map((platform) => platformLabels[platform])
+                            .join("，") || "未设置平台"}
+                        </p>
+                      </div>
+                      <Badge variant="outline">
+                        {contentStatusLabels[content.status]}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+                <Button asChild size="sm" variant="outline" className="mt-2">
+                  <Link href="/calendar">加入日历</Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                <CheckCircle2 className="size-4" />
+                已保存内容基本都有日历计划。
+              </div>
+            )}
+          </ReminderCard>
+
+          <ReminderCard
+            title="高风险内容"
+            description={`本月有 ${data.stats.highRiskContentCount} 条高风险内容。`}
+            icon={AlertTriangle}
+          >
             {data.highRiskContents.length > 0 ? (
               <div className="space-y-2">
                 {data.highRiskContents.map((content) => (
                   <div key={content.id} className="rounded-md border p-3">
                     <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium">{content.title}</p>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {content.title}
+                        </p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           {contentTypeLabels[content.type]} ·{" "}
                           {content.platforms
@@ -388,81 +430,14 @@ export default async function InsightsPage() {
                 ))}
               </div>
             ) : (
-              <div className="flex items-center gap-2 rounded-md border border-dashed p-5 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 rounded-md border border-dashed p-4 text-sm text-muted-foreground">
                 <CheckCircle2 className="size-4" />
                 本月暂无 high 风险内容。
               </div>
             )}
-            <SuggestionBlock title="风险建议" items={insights.riskSuggestions} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <SuggestionList
-          title="内容建议"
-          items={insights.contentSuggestions}
-          icon={Megaphone}
-        />
-        <SuggestionList
-          title="平台建议"
-          items={insights.platformSuggestions}
-          icon={BarChart3}
-        />
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <BarChart3 className="size-4 text-primary" />
-              状态分布
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="space-y-3">
-              <p className="text-sm font-medium">素材状态</p>
-              {data.assetsByStatus.map((item) => (
-                <div key={item.status} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>{assetStatusLabels[item.status]}</span>
-                    <span className="text-muted-foreground">
-                      {item._count._all}
-                    </span>
-                  </div>
-                  <div className="h-2 rounded-full bg-muted">
-                    <div
-                      className="h-2 rounded-full bg-primary"
-                      style={{
-                        width: percent(item._count._all, data.stats.assetCount),
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <Separator />
-            <div className="space-y-3">
-              <p className="text-sm font-medium">内容状态</p>
-              {data.contentsByStatus.map((item) => (
-                <div key={item.status} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>{contentStatusLabels[item.status]}</span>
-                    <span className="text-muted-foreground">
-                      {item._count._all}
-                    </span>
-                  </div>
-                  <div className="h-2 rounded-full bg-muted">
-                    <div
-                      className="h-2 rounded-full bg-primary"
-                      style={{
-                        width: percent(item._count._all, data.stats.contentCount),
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          </ReminderCard>
+        </div>
+      </section>
     </div>
   );
 }

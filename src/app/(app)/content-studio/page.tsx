@@ -9,6 +9,12 @@ import { getContentStudioData } from "@/services/db/current-workspace";
 
 export const dynamic = "force-dynamic";
 
+type ContentStudioPageProps = {
+  searchParams?: Promise<{
+    assetIds?: string;
+  }>;
+};
+
 function isRiskLevel(value: unknown): value is RiskLevel {
   return value === "low" || value === "medium" || value === "high";
 }
@@ -62,8 +68,22 @@ function normalizeRiskNotes(value: unknown): ComplianceCheckResult | null {
   };
 }
 
-export default async function ContentStudioPage() {
-  const result = await getContentStudioData();
+function parseAssetIds(value?: string) {
+  if (!value) return [];
+
+  return value
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+export default async function ContentStudioPage({
+  searchParams,
+}: ContentStudioPageProps) {
+  const params = await searchParams;
+  const initialSelectedAssetIds = parseAssetIds(params?.assetIds);
+  const result = await getContentStudioData(initialSelectedAssetIds);
   const data = result.data;
 
   if (!data) {
@@ -96,6 +116,7 @@ export default async function ContentStudioPage() {
       <ContentGenerator
         workspaceName={data.workspace.name}
         brandName={data.brandProfile?.brandName ?? null}
+        brandTone={data.brandProfile?.brandTone ?? null}
         assets={data.assets.map((asset) => ({
           id: asset.id,
           title: asset.title,
@@ -123,6 +144,7 @@ export default async function ContentStudioPage() {
             fileName: asset.fileName,
           })),
         }))}
+        initialSelectedAssetIds={initialSelectedAssetIds}
       />
     </div>
   );

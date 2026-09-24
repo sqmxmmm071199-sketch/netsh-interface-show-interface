@@ -219,20 +219,30 @@ export async function getAssetsData(status?: AssetStatus | null) {
   });
 }
 
-export async function getContentStudioData() {
+export async function getContentStudioData(preselectedAssetIds: string[] = []) {
   return safeDb(async () => {
     const current = await getCurrentUserWorkspace();
     if (!current) return null;
 
     const workspaceId = current.workspace.id;
+    const selectedAssetIds = preselectedAssetIds.filter(Boolean).slice(0, 12);
     const [assets, recentContents, memories] = await Promise.all([
       prisma.asset.findMany({
-        where: {
-          workspaceId,
-          status: { not: AssetStatus.ARCHIVED },
-        },
+        where:
+          selectedAssetIds.length > 0
+            ? {
+                workspaceId,
+                OR: [
+                  { status: { not: AssetStatus.ARCHIVED } },
+                  { id: { in: selectedAssetIds } },
+                ],
+              }
+            : {
+                workspaceId,
+                status: { not: AssetStatus.ARCHIVED },
+              },
         orderBy: { createdAt: "desc" },
-        take: 30,
+        take: 100,
       }),
       prisma.generatedContent.findMany({
         where: { workspaceId },
@@ -364,6 +374,7 @@ export async function getInsightsData() {
       monthlyCalendarItems,
       memories,
       unusedAssetSamples,
+      unplannedContentSamples,
     ] = await Promise.all([
       prisma.asset.count({ where: { workspaceId } }),
       prisma.asset.count({ where: { workspaceId, status: AssetStatus.UNUSED } }),
@@ -442,6 +453,23 @@ export async function getInsightsData() {
           tags: true,
         },
       }),
+      prisma.generatedContent.findMany({
+        where: {
+          workspaceId,
+          status: { not: ContentStatus.ARCHIVED },
+          calendarItems: { none: {} },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: {
+          id: true,
+          title: true,
+          type: true,
+          status: true,
+          platforms: true,
+          createdAt: true,
+        },
+      }),
     ]);
 
     const platformCounts = new Map<Platform, number>();
@@ -474,6 +502,13 @@ export async function getInsightsData() {
     const publishedCount = monthlyCalendarItems.filter(
       (item) => item.status === ContentStatus.PUBLISHED,
     ).length;
+    const unplannedContentCount = await prisma.generatedContent.count({
+      where: {
+        workspaceId,
+        status: { not: ContentStatus.ARCHIVED },
+        calendarItems: { none: {} },
+      },
+    });
 
     const insightsInput = {
       workspaceName: current.workspace.name,
@@ -496,6 +531,7 @@ export async function getInsightsData() {
         generatedContentCount: monthlyGeneratedContents.length,
         plannedPublishCount,
         publishedCount,
+        unplannedContentCount,
         topPlatform: topPlatform ? platformLabels[topPlatform.value] : null,
         topPlatformCount: topPlatform?.count ?? 0,
         unusedAssetCount,
@@ -543,6 +579,7 @@ export async function getInsightsData() {
         monthlyGeneratedContentCount: monthlyGeneratedContents.length,
         monthlyPlannedPublishCount: plannedPublishCount,
         monthlyPublishedCount: publishedCount,
+        unplannedContentCount,
         highRiskContentCount: highRiskContents.length,
       },
       assetsByStatus,
@@ -561,6 +598,7 @@ export async function getInsightsData() {
         riskLevel: getRiskLevel(content.riskNotes),
       })),
       unusedAssetSamples,
+      unplannedContentSamples,
       insightsInput,
     };
   });

@@ -1,15 +1,18 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useMemo, useState } from "react";
 import type { ContentStatus, ContentType, Platform } from "@prisma/client";
 import { useRouter } from "next/navigation";
 import {
   CalendarDays,
   CheckCircle2,
   Clock3,
+  Eye,
   Filter,
   Loader2,
+  Pencil,
   Plus,
+  Send,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -48,13 +51,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/toast-provider";
+import { getApiErrorMessage, parseApiPayload } from "@/lib/client-api";
 import {
   contentStatusLabels,
   contentTypeLabels,
   platformLabels,
 } from "@/lib/labels";
-import { useToast } from "@/components/ui/toast-provider";
-import { getApiErrorMessage, parseApiPayload } from "@/lib/client-api";
+
+type CalendarAsset = {
+  id: string;
+  title: string | null;
+  fileName: string | null;
+};
 
 export type CalendarPlanItem = {
   id: string;
@@ -69,6 +78,8 @@ export type CalendarPlanItem = {
   notes: string | null;
   generatedContentId: string | null;
   generatedContentTitle: string | null;
+  generatedContentBody: string | null;
+  generatedContentAssets: CalendarAsset[];
 };
 
 export type CalendarGeneratedContentOption = {
@@ -78,11 +89,7 @@ export type CalendarGeneratedContentOption = {
   type: ContentType;
   status: ContentStatus;
   platforms: Platform[];
-  assets: Array<{
-    id: string;
-    title: string | null;
-    fileName: string | null;
-  }>;
+  assets: CalendarAsset[];
 };
 
 type CalendarStatusFilter = ContentStatus | "ALL";
@@ -122,6 +129,12 @@ function toInputDate(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function toInputTime(date: Date) {
+  return `${String(date.getHours()).padStart(2, "0")}:${String(
+    date.getMinutes(),
+  ).padStart(2, "0")}`;
 }
 
 function getMonthKey(date: Date) {
@@ -164,6 +177,69 @@ function sortPlans(plans: CalendarPlanItem[]) {
   );
 }
 
+function getAssetName(asset: CalendarAsset) {
+  return asset.fileName ?? asset.title ?? "未命名素材";
+}
+
+function isPlanFallback(
+  fallback?: CalendarGeneratedContentOption | CalendarPlanItem | null,
+): fallback is CalendarPlanItem {
+  return Boolean(fallback && "scheduledAt" in fallback);
+}
+
+function normalizePlanFromApiItem(
+  item: Partial<CalendarPlanItem> & {
+    generatedContent?: {
+      title?: string | null;
+      body?: string | null;
+      assets?: CalendarAsset[];
+    } | null;
+  },
+  fallback?: CalendarGeneratedContentOption | CalendarPlanItem | null,
+): CalendarPlanItem {
+  const planFallback = isPlanFallback(fallback) ? fallback : null;
+  const contentFallback = fallback && !isPlanFallback(fallback) ? fallback : null;
+
+  return {
+    id: item.id ?? fallback?.id ?? "",
+    title: item.title ?? fallback?.title ?? "未命名主题",
+    description: item.description ?? null,
+    platform:
+      item.platform ??
+      planFallback?.platform ??
+      contentFallback?.platforms[0] ??
+      "XIAOHONGSHU",
+    contentType:
+      item.contentType ?? planFallback?.contentType ?? contentFallback?.type ?? "POST",
+    status: item.status ?? planFallback?.status ?? "SCHEDULED",
+    scheduledAt:
+      item.scheduledAt ?? planFallback?.scheduledAt ?? new Date().toISOString(),
+    publishedAt: item.publishedAt ?? null,
+    ownerName: item.ownerName ?? null,
+    notes: item.notes ?? null,
+    generatedContentId:
+      item.generatedContentId ?? planFallback?.generatedContentId ?? contentFallback?.id ?? null,
+    generatedContentTitle:
+      item.generatedContent?.title ??
+      item.generatedContentTitle ??
+      planFallback?.generatedContentTitle ??
+      contentFallback?.title ??
+      null,
+    generatedContentBody:
+      item.generatedContent?.body ??
+      item.generatedContentBody ??
+      planFallback?.generatedContentBody ??
+      contentFallback?.body ??
+      null,
+    generatedContentAssets:
+      item.generatedContent?.assets ??
+      item.generatedContentAssets ??
+      planFallback?.generatedContentAssets ??
+      contentFallback?.assets ??
+      [],
+  };
+}
+
 export function CalendarContent({
   items,
   generatedContents,
@@ -178,7 +254,9 @@ export function CalendarContent({
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
     plans[0] ? new Date(plans[0].scheduledAt) : new Date(),
   );
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [detailItemId, setDetailItemId] = useState<string | null>(null);
+  const [editItemId, setEditItemId] = useState<string | null>(null);
   const [selectedContentId, setSelectedContentId] = useState(
     generatedContents[0]?.id ?? "",
   );
@@ -196,10 +274,16 @@ export function CalendarContent({
   );
   const [topic, setTopic] = useState(selectedContent?.title ?? "");
   const [notes, setNotes] = useState("");
+  const [editDate, setEditDate] = useState(getDefaultDate);
+  const [editTime, setEditTime] = useState("10:00");
+  const [editPlatform, setEditPlatform] = useState<Platform>("XIAOHONGSHU");
+  const [editTopic, setEditTopic] = useState("");
+  const [editNotes, setEditNotes] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [updatingItemId, setUpdatingItemId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   const visiblePlans = useMemo(
     () =>
@@ -220,6 +304,15 @@ export function CalendarContent({
     return plans.filter((plan) => getMonthKey(new Date(plan.scheduledAt)) === monthKey);
   }, [plans, selectedDate]);
 
+  const detailPlan = useMemo(
+    () => plans.find((plan) => plan.id === detailItemId) ?? null,
+    [detailItemId, plans],
+  );
+  const editPlan = useMemo(
+    () => plans.find((plan) => plan.id === editItemId) ?? null,
+    [editItemId, plans],
+  );
+
   function handleContentChange(contentId: string) {
     const content = generatedContents.find((item) => item.id === contentId);
     setSelectedContentId(contentId);
@@ -235,6 +328,17 @@ export function CalendarContent({
   function notifyError(title: string, message: string) {
     setFormError(message);
     showToast({ type: "error", title, description: message });
+  }
+
+  function openEdit(plan: CalendarPlanItem) {
+    const scheduledAt = new Date(plan.scheduledAt);
+    setEditItemId(plan.id);
+    setEditDate(toInputDate(scheduledAt));
+    setEditTime(toInputTime(scheduledAt));
+    setEditPlatform(plan.platform);
+    setEditTopic(plan.title);
+    setEditNotes(plan.notes ?? "");
+    setFormError(null);
   }
 
   async function handleCreateCalendarItem(event: FormEvent<HTMLFormElement>) {
@@ -268,32 +372,11 @@ export function CalendarContent({
         throw new Error(getApiErrorMessage(data, "创建内容日历项失败。"));
       }
 
-      const item = data.item as Omit<
-        CalendarPlanItem,
-        "generatedContentTitle"
-      > & {
-        generatedContent?: { title: string } | null;
-      };
-
-      const nextPlan: CalendarPlanItem = {
-        id: item.id,
-        title: item.title,
-        description: item.description,
-        platform: item.platform,
-        contentType: item.contentType,
-        status: item.status,
-        scheduledAt: item.scheduledAt,
-        publishedAt: item.publishedAt,
-        ownerName: item.ownerName,
-        notes: item.notes,
-        generatedContentId: item.generatedContentId,
-        generatedContentTitle:
-          item.generatedContent?.title ?? selectedContent.title,
-      };
+      const nextPlan = normalizePlanFromApiItem(data.item, selectedContent);
 
       setPlans((current) => sortPlans([...current, nextPlan]));
       setSelectedDate(new Date(nextPlan.scheduledAt));
-      setDialogOpen(false);
+      setCreateDialogOpen(false);
       setNotes("");
       notifySuccess("已加入内容日历。");
       router.refresh();
@@ -307,7 +390,59 @@ export function CalendarContent({
     }
   }
 
+  async function handleUpdateCalendarItem(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!editPlan) return;
+
+    setIsEditing(true);
+    setFormError(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await fetch(`/api/calendar-items/${editPlan.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          plannedDate: editDate,
+          plannedTime: editTime,
+          platform: editPlatform,
+          topic: editTopic,
+          notes: editNotes,
+        }),
+      });
+      const data = await parseApiPayload(response);
+
+      if (!response.ok) {
+        throw new Error(getApiErrorMessage(data, "更新内容日历计划失败。"));
+      }
+
+      const updatedPlan = normalizePlanFromApiItem(data.item, editPlan);
+      setPlans((current) =>
+        sortPlans(
+          current.map((plan) =>
+            plan.id === updatedPlan.id ? updatedPlan : plan,
+          ),
+        ),
+      );
+      setSelectedDate(new Date(updatedPlan.scheduledAt));
+      setEditItemId(null);
+      notifySuccess("内容日历计划已更新。");
+      router.refresh();
+    } catch (error) {
+      notifyError(
+        "更新失败",
+        error instanceof Error ? error.message : "更新内容日历计划失败。",
+      );
+    } finally {
+      setIsEditing(false);
+    }
+  }
+
   async function handleStatusChange(itemId: string, nextStatus: ContentStatus) {
+    const currentPlan = plans.find((plan) => plan.id === itemId);
+    if (currentPlan?.status === nextStatus) return;
+
     setUpdatingItemId(itemId);
     setFormError(null);
     setSuccessMessage(null);
@@ -360,21 +495,21 @@ export function CalendarContent({
         <div>
           <h2 className="text-base font-semibold">内容日历管理</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            用内容库里的 GeneratedContent 创建排期，并在发布后同步更新内容和素材状态。
+            创建发布计划、调整时间，并在发布后同步更新内容和素材状态。
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
           <DialogTrigger asChild>
             <Button disabled={generatedContents.length === 0}>
               <Plus className="size-4" />
               加入日历
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>加入内容日历</DialogTitle>
               <DialogDescription>
-                选择一条已保存内容，设置发布时间、平台和内容主题。
+                选择一条已保存内容，设置发布日期、时间、平台和主题。
               </DialogDescription>
             </DialogHeader>
             <form className="space-y-4" onSubmit={handleCreateCalendarItem}>
@@ -478,7 +613,7 @@ export function CalendarContent({
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setDialogOpen(false)}
+                  onClick={() => setCreateDialogOpen(false)}
                 >
                   取消
                 </Button>
@@ -502,7 +637,7 @@ export function CalendarContent({
           {successMessage}
         </div>
       ) : null}
-      {formError && !dialogOpen ? (
+      {formError && !createDialogOpen && !editPlan ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
           {formError}
         </div>
@@ -528,7 +663,7 @@ export function CalendarContent({
               <CalendarDays className="size-4 text-primary" />
               月历视图
             </CardTitle>
-            <CardDescription>查看当月排期分布和计划密度。</CardDescription>
+            <CardDescription>查看当月内容计划。</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Calendar
@@ -536,9 +671,7 @@ export function CalendarContent({
               selected={selectedDate}
               onSelect={(date) => setSelectedDate(date)}
               defaultMonth={selectedDate}
-              modifiers={{
-                planned: plannedDates,
-              }}
+              modifiers={{ planned: plannedDates }}
               modifiersClassNames={{
                 planned: "border border-primary/50 bg-primary/5",
               }}
@@ -551,10 +684,12 @@ export function CalendarContent({
               </div>
               {selectedMonthPlans.length > 0 ? (
                 <div className="space-y-2">
-                  {selectedMonthPlans.slice(0, 5).map((plan) => (
-                    <div
+                  {selectedMonthPlans.slice(0, 6).map((plan) => (
+                    <button
                       key={plan.id}
-                      className="rounded-md border px-3 py-2 text-sm"
+                      type="button"
+                      className="w-full rounded-md border px-3 py-2 text-left text-sm transition-colors hover:bg-muted/40"
+                      onClick={() => setDetailItemId(plan.id)}
                     >
                       <div className="flex items-center justify-between gap-3">
                         <span className="truncate font-medium">{plan.title}</span>
@@ -566,13 +701,13 @@ export function CalendarContent({
                         {formatDateOnly(plan.scheduledAt)} ·{" "}
                         {formatTimeOnly(plan.scheduledAt)}
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               ) : (
                 <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
                   {plans.length === 0
-                    ? "把生成的内容加入日历，规划接下来一周的发布。"
+                    ? "还没有内容计划。"
                     : "当前月份还没有内容计划。"}
                 </div>
               )}
@@ -586,7 +721,7 @@ export function CalendarContent({
               <div>
                 <CardTitle>列表视图</CardTitle>
                 <CardDescription>
-                  管理发布日期、发布平台、内容主题和执行状态。
+                  管理发布日期、时间、平台、状态和发布动作。
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
@@ -617,12 +752,13 @@ export function CalendarContent({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>日期</TableHead>
-                      <TableHead>时间</TableHead>
+                      <TableHead>发布日期</TableHead>
+                      <TableHead>发布时间</TableHead>
                       <TableHead>平台</TableHead>
                       <TableHead>内容标题</TableHead>
-                      <TableHead>主题</TableHead>
                       <TableHead>状态</TableHead>
+                      <TableHead className="text-right">素材</TableHead>
+                      <TableHead className="text-right">操作</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -638,21 +774,17 @@ export function CalendarContent({
                           </span>
                         </TableCell>
                         <TableCell>{platformLabels[plan.platform]}</TableCell>
-                        <TableCell className="min-w-48">
-                          <div className="font-medium">
+                        <TableCell className="min-w-56">
+                          <button
+                            type="button"
+                            className="text-left font-medium hover:text-primary"
+                            onClick={() => setDetailItemId(plan.id)}
+                          >
                             {plan.generatedContentTitle ?? "未关联内容"}
-                          </div>
+                          </button>
                           <div className="mt-1 text-xs text-muted-foreground">
-                            {contentTypeLabels[plan.contentType]}
+                            主题：{plan.title}
                           </div>
-                        </TableCell>
-                        <TableCell className="min-w-44">
-                          <div className="font-medium">{plan.title}</div>
-                          {plan.notes ? (
-                            <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                              {plan.notes}
-                            </div>
-                          ) : null}
                         </TableCell>
                         <TableCell>
                           <Select
@@ -673,11 +805,49 @@ export function CalendarContent({
                               ))}
                             </SelectContent>
                           </Select>
-                          {plan.status === "PUBLISHED" ? (
-                            <div className="mt-2 text-xs text-muted-foreground">
-                              已同步素材为已使用
-                            </div>
-                          ) : null}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {plan.generatedContentAssets.length}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="outline"
+                              title="查看详情"
+                              onClick={() => setDetailItemId(plan.id)}
+                            >
+                              <Eye className="size-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="outline"
+                              title="修改计划"
+                              onClick={() => openEdit(plan)}
+                            >
+                              <Pencil className="size-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={
+                                plan.status === "PUBLISHED" ||
+                                updatingItemId === plan.id
+                              }
+                              onClick={() =>
+                                handleStatusChange(plan.id, "PUBLISHED")
+                              }
+                            >
+                              {updatingItemId === plan.id ? (
+                                <Loader2 className="size-4 animate-spin" />
+                              ) : (
+                                <Send className="size-4" />
+                              )}
+                              已发布
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -701,6 +871,217 @@ export function CalendarContent({
           </CardContent>
         </Card>
       </div>
+
+      <Dialog
+        open={Boolean(detailPlan)}
+        onOpenChange={(open) => {
+          if (!open) setDetailItemId(null);
+        }}
+      >
+        <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-3xl">
+          {detailPlan ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{detailPlan.generatedContentTitle ?? detailPlan.title}</DialogTitle>
+                <DialogDescription>
+                  {formatDateOnly(detailPlan.scheduledAt)} ·{" "}
+                  {formatTimeOnly(detailPlan.scheduledAt)} ·{" "}
+                  {platformLabels[detailPlan.platform]}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-5">
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant={getStatusVariant(detailPlan.status)}>
+                    {contentStatusLabels[detailPlan.status]}
+                  </Badge>
+                  <Badge variant="outline">
+                    {contentTypeLabels[detailPlan.contentType]}
+                  </Badge>
+                  <Badge variant="secondary">
+                    {detailPlan.generatedContentAssets.length} 个关联素材
+                  </Badge>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-md border p-4">
+                    <p className="text-sm font-medium">内容主题</p>
+                    <p className="mt-2 break-words text-sm text-muted-foreground">
+                      {detailPlan.title}
+                    </p>
+                  </div>
+                  <div className="rounded-md border p-4">
+                    <p className="text-sm font-medium">发布状态</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {contentStatusLabels[detailPlan.status]}
+                      {detailPlan.publishedAt
+                        ? ` · ${new Date(detailPlan.publishedAt).toLocaleString("zh-CN")}`
+                        : ""}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium">内容正文</p>
+                  <div className="mt-2 rounded-md border bg-muted/25 p-4">
+                    <p className="whitespace-pre-line break-words text-sm leading-7 text-muted-foreground">
+                      {detailPlan.generatedContentBody ??
+                        detailPlan.description ??
+                        "暂无正文。"}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium">关联素材</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {detailPlan.generatedContentAssets.length > 0 ? (
+                      detailPlan.generatedContentAssets.map((asset) => (
+                        <Badge key={asset.id} variant="outline">
+                          {getAssetName(asset)}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-sm text-muted-foreground">
+                        暂无关联素材
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {detailPlan.notes ? (
+                  <div>
+                    <p className="text-sm font-medium">备注</p>
+                    <p className="mt-2 break-words text-sm leading-6 text-muted-foreground">
+                      {detailPlan.notes}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => openEdit(detailPlan)}
+                >
+                  <Pencil className="size-4" />
+                  修改计划
+                </Button>
+                <Button
+                  type="button"
+                  disabled={
+                    detailPlan.status === "PUBLISHED" ||
+                    updatingItemId === detailPlan.id
+                  }
+                  onClick={() => handleStatusChange(detailPlan.id, "PUBLISHED")}
+                >
+                  {updatingItemId === detailPlan.id ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Send className="size-4" />
+                  )}
+                  标记为已发布
+                </Button>
+              </DialogFooter>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(editPlan)}
+        onOpenChange={(open) => {
+          if (!open) setEditItemId(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          {editPlan ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>修改内容计划</DialogTitle>
+                <DialogDescription>
+                  修改发布时间、平台、主题和备注。状态请在列表中切换。
+                </DialogDescription>
+              </DialogHeader>
+              <form className="space-y-4" onSubmit={handleUpdateCalendarItem}>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="space-y-2 text-sm font-medium">
+                    发布日期
+                    <Input
+                      type="date"
+                      value={editDate}
+                      onChange={(event) => setEditDate(event.target.value)}
+                      required
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm font-medium">
+                    发布时间
+                    <Input
+                      type="time"
+                      value={editTime}
+                      onChange={(event) => setEditTime(event.target.value)}
+                      required
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm font-medium">
+                    平台
+                    <Select
+                      value={editPlatform}
+                      onValueChange={(value) => setEditPlatform(value as Platform)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {platformOptions.map((item) => (
+                          <SelectItem key={item} value={item}>
+                            {platformLabels[item]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </label>
+                  <label className="space-y-2 text-sm font-medium">
+                    内容主题
+                    <Input
+                      value={editTopic}
+                      onChange={(event) => setEditTopic(event.target.value)}
+                      required
+                    />
+                  </label>
+                  <label className="space-y-2 text-sm font-medium md:col-span-2">
+                    备注
+                    <Textarea
+                      value={editNotes}
+                      onChange={(event) => setEditNotes(event.target.value)}
+                      rows={4}
+                    />
+                  </label>
+                </div>
+                {formError ? (
+                  <p className="text-sm text-destructive">{formError}</p>
+                ) : null}
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setEditItemId(null)}
+                  >
+                    取消
+                  </Button>
+                  <Button type="submit" disabled={isEditing}>
+                    {isEditing ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Pencil className="size-4" />
+                    )}
+                    保存修改
+                  </Button>
+                </DialogFooter>
+              </form>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

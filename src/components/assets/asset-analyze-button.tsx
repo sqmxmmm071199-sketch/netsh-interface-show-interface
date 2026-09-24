@@ -3,16 +3,33 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonProps } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
 import { getApiErrorMessage, parseApiPayload } from "@/lib/client-api";
+import { cn } from "@/lib/utils";
 
 type NoticeState = {
   type: "success" | "error";
   message: string;
 } | null;
 
-export function AssetAnalyzeButton({ assetId }: { assetId: string }) {
+type AssetAnalyzeButtonProps = {
+  assetId: string;
+  className?: string;
+  label?: string;
+  showNotice?: boolean;
+  size?: ButtonProps["size"];
+  variant?: ButtonProps["variant"];
+};
+
+export function AssetAnalyzeButton({
+  assetId,
+  className,
+  label = "AI 分析",
+  showNotice = true,
+  size = "default",
+  variant = "secondary",
+}: AssetAnalyzeButtonProps) {
   const router = useRouter();
   const { showToast } = useToast();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -52,9 +69,10 @@ export function AssetAnalyzeButton({ assetId }: { assetId: string }) {
   return (
     <div className="min-w-0 space-y-2">
       <Button
-        className="w-full min-w-0"
+        className={cn(showNotice ? "w-full" : "", "min-w-0", className)}
         type="button"
-        variant="secondary"
+        variant={variant}
+        size={size}
         disabled={isAnalyzing}
         onClick={handleAnalyze}
       >
@@ -63,9 +81,9 @@ export function AssetAnalyzeButton({ assetId }: { assetId: string }) {
         ) : (
           <Sparkles className="size-4" />
         )}
-        AI 分析
+        {label}
       </Button>
-      {notice ? (
+      {showNotice && notice ? (
         <p
           className={`text-xs leading-5 ${
             notice.type === "success" ? "text-emerald-700" : "text-destructive"

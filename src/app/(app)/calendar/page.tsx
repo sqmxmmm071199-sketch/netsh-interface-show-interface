@@ -45,6 +45,13 @@ export default async function CalendarPage() {
     notes: item.notes,
     generatedContentId: item.generatedContentId,
     generatedContentTitle: item.generatedContent?.title ?? null,
+    generatedContentBody: item.generatedContent?.body ?? null,
+    generatedContentAssets:
+      item.generatedContent?.assets.map((asset) => ({
+        id: asset.id,
+        title: asset.title,
+        fileName: asset.fileName,
+      })) ?? [],
   }));
 
   const generatedContents: CalendarGeneratedContentOption[] =
